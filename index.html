@@ -37,8 +37,17 @@
 </head>
 <body>
 <header>
-  <h1>Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»</h1>
+  <h1 id="titleText">Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»</h1>
+
+  <div style="position:absolute; right:12px; top:10px;">
+    <select id="langSelect" style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">
+      <option value="ru">Русский</option>
+      <option value="en">English</option>
+      <option value="he">עברית</option>
+    </select>
+  </div>
 </header>
+
 
 <main>
   <!-- Панель режимов -->
@@ -199,5 +208,40 @@ btnFinishNorm.addEventListener('click',()=>{setMode('main');const ref=getNormali
 // ======== Init ========
 window.addEventListener('load',()=>{applyMode();drawEnergyHistory();setStatus('Готов.','ok');});
 </script>
+
+<script>
+const LANG_KEY='ui_lang_v1';
+const translations={
+  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов."},
+  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready."},
+  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן."}
+};
+function textMatches(el,vars){const t=(el.textContent||'').trim();return vars.some(v=>v===t);}
+function findOrBindButton(id,keys){let el=document.getElementById(id);if(el)return el;const btns=Array.from(document.querySelectorAll('button'));for(const b of btns){if(textMatches(b,keys)){b.id=id;return b;}}return null;}
+function applyTranslations(lang){
+  const t=translations[lang]||translations.ru;
+  const title=document.getElementById('titleText'); if(title) title.textContent=t.title;
+  const b1=findOrBindButton('btnStartNorm',[translations.ru.startNorm,translations.en.startNorm,translations.he.startNorm]); if(b1) b1.textContent=t.startNorm;
+  const b2=findOrBindButton('btnFinishNorm',[translations.ru.finishNorm,translations.en.finishNorm,translations.he.finishNorm]); if(b2) b2.textContent=t.finishNorm;
+  const b3=findOrBindButton('btnRequestMic',[translations.ru.requestMic,translations.en.requestMic,translations.he.requestMic]); if(b3) b3.textContent=t.requestMic;
+  const b4=findOrBindButton('btnStart',[translations.ru.startRec,translations.en.startRec,translations.he.startRec]); if(b4) b4.textContent=t.startRec;
+  const b5=findOrBindButton('btnStop',[translations.ru.stopRec,translations.en.stopRec,translations.he.stopRec]); if(b5) b5.textContent=t.stopRec;
+  const b6=findOrBindButton('btnReset',[translations.ru.reset,translations.en.reset,translations.he.reset]); if(b6) b6.textContent=t.reset;
+  const b7=findOrBindButton('btnResetLast',[translations.ru.resetLast,translations.en.resetLast,translations.he.resetLast]); if(b7) b7.textContent=t.resetLast;
+  const h1=document.querySelector('#historySection h3'); if(h1) h1.textContent=t.historyTitle;
+  const hh=document.querySelector('#historySection .hint'); if(hh) hh.textContent=t.historyHint;
+  document.body.dir=(lang==='he')?'rtl':'ltr';
+  localStorage.setItem(LANG_KEY,lang);
+  try{ setStatus(t.ready,'ok'); }catch(e){}
+}
+function initI18n(){
+  const sel=document.getElementById('langSelect'); if(!sel) return;
+  const saved=localStorage.getItem(LANG_KEY)||'ru';
+  sel.value=saved; applyTranslations(saved);
+  sel.addEventListener('change',e=>applyTranslations(e.target.value));
+}
+window.addEventListener('load', initI18n);
+</script>
+
 </body>
 </html>
