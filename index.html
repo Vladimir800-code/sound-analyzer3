@@ -28,8 +28,7 @@
   #modeBadge{margin-left:auto; font-size:12px; padding:4px 8px; border-radius:999px; background:#eef; color:#223;}
   body[data-mode="normalization"] #modeBadge{background:#fff6d6; color:#6b4e00;}
   body[data-mode="main"] #modeBadge{background:#e6ffe7; color:#0a5c10;}
-  .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin:0 12px;}
-  .card{border:1px solid #ddd; border-radius:10px; padding:10px 12px; background:#fff;}
+  .card{border:1px solid #ddd; border-radius:10px; padding:10px 12px; background:#fff; margin:8px 12px;}
   .status{margin:8px 12px; font-size:14px;}
   .status.ok{color:var(--ok)} .status.warn{color:var(--warn)} .status.error{color:var(--error)}
   canvas{border:1px solid #ddd; border-radius:6px; margin:8px 12px;}
@@ -63,407 +62,109 @@
   <canvas id="mainGraph" width="980" height="320"></canvas>
 
   <!-- История текущего режима -->
-  <section id="historySection" class="card" style="margin:8px 12px;">
+  <section id="historySection" class="card">
     <h3 style="margin:0 0 6px 0;">История результатов текущего режима</h3>
     <canvas id="historyGraph" width="980" height="240"></canvas>
     <div class="hint">В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть &gt;1 или &lt;1).</div>
+    <div class="toolbar" style="justify-content:flex-end; margin-top:4px;">
+      <button id="btnResetLast" class="button">Сбросить последнее</button>
+    </div>
   </section>
 </main>
 
 <script>
 // ======== Глобальные переменные ========
-let audioCtx = null;
-let micStream = null;
-let analyser = null;
-let source = null;
-let rafId = null;
-let recording = false;
-let t0 = 0;
-let lastT = 0;
-
-const MODE_KEY = 'analysisModeV1'; // 'normalization' | 'main'
-const ENERGY_HISTORY_KEY = 'energyHistoryV1'; // нормирование: абсолютные энергии
-const ENERGY_HISTORY_MAIN_KEY = 'energyHistoryMainV1'; // основной режим: нормированные асимптоты
-
-const modeBadge = document.getElementById('modeBadge');
-const statusEl = document.getElementById('status');
-const canvas = document.getElementById('mainGraph');
-const ctx = canvas.getContext('2d');
-const historyCanvas = document.getElementById('historyGraph');
-const hctx = historyCanvas.getContext('2d');
-
-const btnRequestMic = document.getElementById('btnRequestMic');
-const btnStart = document.getElementById('btnStart');
-const btnStop = document.getElementById('btnStop');
-const btnReset = document.getElementById('btnReset');
-const btnStartNorm = document.getElementById('btnStartNorm');
-const btnFinishNorm = document.getElementById('btnFinishNorm');
+let audioCtx=null, micStream=null, analyser=null, source=null, rafId=null;
+let recording=false, t0=0, lastT=0;
+const MODE_KEY='analysisModeV1';
+const ENERGY_HISTORY_KEY='energyHistoryV1';
+const ENERGY_HISTORY_MAIN_KEY='energyHistoryMainV1';
+const modeBadge=document.getElementById('modeBadge');
+const statusEl=document.getElementById('status');
+const canvas=document.getElementById('mainGraph'), ctx=canvas.getContext('2d');
+const historyCanvas=document.getElementById('historyGraph'), hctx=historyCanvas.getContext('2d');
+const btnRequestMic=document.getElementById('btnRequestMic');
+const btnStart=document.getElementById('btnStart');
+const btnStop=document.getElementById('btnStop');
+const btnReset=document.getElementById('btnReset');
+const btnStartNorm=document.getElementById('btnStartNorm');
+const btnFinishNorm=document.getElementById('btnFinishNorm');
+const btnResetLast=document.getElementById('btnResetLast');
 
 // ======== Утилиты статуса ========
-function setStatus(msg, level='ok'){
-  statusEl.className = 'status ' + (level||'ok');
-  statusEl.textContent = msg;
-}
+function setStatus(msg, level='ok'){ statusEl.className='status '+(level||'ok'); statusEl.textContent=msg; }
 
 // ======== Режимы ========
-function getMode(){
-  const v = localStorage.getItem(MODE_KEY);
-  return (v==='main' || v==='normalization') ? v : 'normalization';
-}
-function setMode(v){
-  localStorage.setItem(MODE_KEY, v);
-  applyMode();
-}
-function applyMode(){
-  const mode = getMode();
-  document.body.setAttribute('data-mode', mode);
-  modeBadge.textContent = 'Режим: ' + (mode==='normalization' ? 'Нормирование' : 'Основной анализ');
-  drawEnergyHistory(); // перерисовать историю соответствующую режиму
-}
+function getMode(){const v=localStorage.getItem(MODE_KEY); return (v==='main'||v==='normalization')?v:'normalization';}
+function setMode(v){localStorage.setItem(MODE_KEY,v); applyMode();}
+function applyMode(){const mode=getMode(); document.body.setAttribute('data-mode',mode); modeBadge.textContent='Режим: '+(mode==='normalization'?'Нормирование':'Основной анализ'); drawEnergyHistory();}
 
 // ======== Истории ========
-function loadEnergyHistory(){
-  try{ const raw = localStorage.getItem(ENERGY_HISTORY_KEY); return raw? JSON.parse(raw): []; }catch{return []}
-}
-function saveEnergyHistory(arr){
-  try{ localStorage.setItem(ENERGY_HISTORY_KEY, JSON.stringify(arr)); }catch{}
-}
-function addEnergyHistoryEntry(energy){ // абсолютная
-  const d = new Date(); d.setSeconds(0,0);
-  const hist = loadEnergyHistory();
-  hist.push({ ts: d.toISOString(), energy: Number(energy)||0 });
-  saveEnergyHistory(hist);
-}
+function loadEnergyHistory(){try{const r=localStorage.getItem(ENERGY_HISTORY_KEY); return r?JSON.parse(r):[]}catch{return[]}}
+function saveEnergyHistory(a){try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.stringify(a))}catch{}}
+function addEnergyHistoryEntry(e){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h);}
+function loadEnergyHistoryMain(){try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[]}catch{return[]}}
+function saveEnergyHistoryMain(a){try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a))}catch{}}
+function addEnergyHistoryEntryMain(n){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h);}
+function getNormalizationReference(){const h=loadEnergyHistory(); if(!h.length)return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
 
-function loadEnergyHistoryMain(){
-  try{ const raw = localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return raw? JSON.parse(raw): []; }catch{return []}
-}
-function saveEnergyHistoryMain(arr){
-  try{ localStorage.setItem(ENERGY_HISTORY_MAIN_KEY, JSON.stringify(arr)); }catch{}
-}
-function addEnergyHistoryEntryMain(normVal){ // нормированная
-  const d = new Date(); d.setSeconds(0,0);
-  const hist = loadEnergyHistoryMain();
-  hist.push({ ts: d.toISOString(), norm: Number(normVal)||0 });
-  saveEnergyHistoryMain(hist);
-}
-
-// Эталон для нормировки — максимум из истории нормирования
-function getNormalizationReference(){
-  const hist = loadEnergyHistory();
-  if (!hist.length) return null;
-  let maxV = -Infinity;
-  for (const h of hist){
-    const v = Number(h.energy) || 0;
-    if (v > maxV) maxV = v;
-  }
-  return (isFinite(maxV) && maxV>0) ? maxV : null;
-}
-
-// ======== График истории текущего режима ========
+// ======== График истории ========
 function drawEnergyHistory(){
-  const mode = getMode();
-  const isMain = (mode==='main');
-  const data = isMain ? loadEnergyHistoryMain() : loadEnergyHistory();
-  hctx.clearRect(0,0,historyCanvas.width, historyCanvas.height);
-  if (!data.length){
-    hctx.fillStyle='#555'; hctx.font='14px Arial';
-    hctx.fillText(isMain? 'История основного режима пуста.' : 'История нормирования пуста.', 20, 30);
-    return;
-  }
-  const values = data.map(d => isMain ? (Number(d.norm)||0) : (Number(d.energy)||0));
-  const maxV = Math.max(...values) || 1;
-  const leftPad=50, bottomPad=28, rightPad=20, topPad=12;
-  const W = historyCanvas.width - leftPad - rightPad;
-  const H = historyCanvas.height - topPad - bottomPad;
-
-  // сетка Y
-  hctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid');
-  hctx.lineWidth = 1;
-  const steps = 4;
-  for (let i=0;i<=steps;i++){
-    const y = topPad + H - (H*i/steps);
-    hctx.beginPath(); hctx.moveTo(leftPad,y); hctx.lineTo(leftPad+W, y); hctx.stroke();
-    hctx.fillStyle='#555'; hctx.font='11px Arial';
-    const val = (maxV*i/steps);
-    const label = isMain ? val.toFixed(2) : val.toExponential(2);
-    hctx.fillText(label, 6, y-2);
-  }
-  // оси
-  hctx.strokeStyle='#000';
-  hctx.beginPath(); hctx.moveTo(leftPad,topPad); hctx.lineTo(leftPad,topPad+H); hctx.lineTo(leftPad+W,topPad+H); hctx.stroke();
-
-  // подписи осей
-  hctx.fillStyle='#000'; hctx.font='12px Arial';
-  hctx.fillText('№ сеанса / время', leftPad+W/2-60, topPad+H+22);
-  hctx.save(); hctx.rotate(-Math.PI/2);
-  hctx.fillText(isMain? 'Нормированная асимптота (отн.)' : 'Интегральная энергия (Вт·с/м²)', -topPad-H/2-80, 15);
-  hctx.restore();
-
-  // линия
-  hctx.beginPath();
-  const N = data.length;
-  for (let i=0;i<N;i++){
-    const x = leftPad + (W*(i/Math.max(1, N-1)));
-    const y = topPad + H - (H*(values[i]/maxV));
-    if (i===0) hctx.moveTo(x,y); else hctx.lineTo(x,y);
-  }
-  hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
-
-  // точки + подписи
-  hctx.fillStyle='#111'; hctx.font='10px Arial';
-  const tickStep = Math.ceil(N/8);
-  for (let i=0;i<N;i++){
-    const x = leftPad + (W*(i/Math.max(1, N-1)));
-    const y = topPad + H - (H*(values[i]/maxV));
-    hctx.beginPath(); hctx.arc(x,y,2.5,0,Math.PI*2); hctx.fill();
-    if (i%tickStep===0 || i===N-1){
-      const d = new Date(data[i].ts);
-      const label = d.toLocaleString(undefined,{month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
-      hctx.fillText(label, x-32, topPad+H+14);
-    }
-  }
+  const mode=getMode(), isMain=(mode==='main');
+  const data=isMain?loadEnergyHistoryMain():loadEnergyHistory();
+  hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
+  if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?'История основного режима пуста.':'История нормирования пуста.',20,30);return;}
+  const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
+  const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
+  hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
+  hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
+  hctx.fillStyle='#000';hctx.font='12px Arial';hctx.fillText('№ сеанса / время',leftPad+W/2-60,topPad+H+22);hctx.save();hctx.rotate(-Math.PI/2);hctx.fillText(isMain?'Нормированная асимптота (отн.)':'Интегральная энергия (Вт·с/м²)',-topPad-H/2-80,15);hctx.restore();
+  hctx.beginPath(); const N=data.length; for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); if(i===0)hctx.moveTo(x,y); else hctx.lineTo(x,y);} hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
+  hctx.fillStyle='#111';hctx.font='10px Arial';const step=Math.ceil(N/8); for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
 }
 
-// ======== Рисование основного графика ========
-function mapValToY(val, minV, maxV){
-  const h = canvas.height;
-  const p = (val-minV)/(maxV-minV || 1);
-  return (h-1) - p*(h-1);
-}
-function drawGraph(intensityValues, secondSeriesValues, isNormalized=false){
-  ctx.clearRect(0,0,canvas.width, canvas.height);
-
-  // Maxes
-  let maxIntensity = 0;
-  for (let v of intensityValues) if (v>maxIntensity) maxIntensity = v;
-  if (!isFinite(maxIntensity) || maxIntensity<=0) maxIntensity = 1;
-
-  let maxSecond = 0;
-  for (let v of secondSeriesValues) if (v>maxSecond) maxSecond = v;
-  if (!isFinite(maxSecond) || maxSecond<=0) maxSecond = 1;
-
-  const maxIntensityForScale = maxIntensity * 1.05;
-  const maxSecondForScale = maxSecond * 1.1;
-
-  // grid
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid');
-  ctx.lineWidth = 1;
-  const steps=5;
-  for (let i=0;i<=steps;i++){
-    const y = mapValToY(maxIntensityForScale*i/steps, 0, maxIntensityForScale);
-    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width, y); ctx.stroke();
-  }
-
-  // axes
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes');
-  ctx.lineWidth=1.5;
-  ctx.beginPath();
-  ctx.moveTo(0, canvas.height-1); ctx.lineTo(canvas.width, canvas.height-1);
-  ctx.moveTo(0, 0); ctx.lineTo(0, canvas.height);
-  ctx.stroke();
-
-  // left labels
-  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text');
-  ctx.font='12px Arial'; ctx.textAlign='left';
-  for (let i=0;i<=steps;i++){
-    const val = maxIntensityForScale*i/steps;
-    const y = mapValToY(val, 0, maxIntensityForScale);
-    ctx.fillText(val.toExponential(2), 5, y-3);
-  }
-  ctx.save(); ctx.rotate(-Math.PI/2); ctx.fillText('Интенсивность (условн. ед.)', -canvas.height+10, 14); ctx.restore();
-
-  // right labels
-  ctx.textAlign='right';
-  for (let i=0;i<=steps;i++){
-    const val = maxSecondForScale*i/steps;
-    const y = mapValToY(val, 0, maxSecondForScale);
-    ctx.fillText(isNormalized? val.toFixed(2) : val.toExponential(2), canvas.width-5, y-3);
-  }
-  ctx.save(); ctx.rotate(Math.PI/2);
-  ctx.fillText(isNormalized? 'Нормированная энергия (отн.)' : 'Энергия (Вт·с/м² — условно)', canvas.height/2 - 60, canvas.width - 10);
-  ctx.restore();
-
-  // series 1: intensity
-  const N = intensityValues.length;
-  const denom = Math.max(N-1, 1);
-  ctx.beginPath();
-  for (let i=0;i<N;i++){
-    const x = (i/denom)*canvas.width;
-    const y = mapValToY(intensityValues[i], 0, maxIntensityForScale);
-    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  }
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--blue');
-  ctx.lineWidth=2; ctx.stroke();
-
-  // series 2: energy or normalized
-  const M = secondSeriesValues.length;
-  ctx.beginPath();
-  for (let i=0;i<M;i++){
-    const x = (i/Math.max(M-1,1))*canvas.width;
-    const y = mapValToY(secondSeriesValues[i], 0, maxSecondForScale);
-    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-  }
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green');
-  ctx.lineWidth=2; ctx.stroke();
-
-  // guide for last value
-  if (secondSeriesValues.length>1){
-    const last = secondSeriesValues[secondSeriesValues.length-1];
-    const y = mapValToY(last, 0, maxSecondForScale);
-    ctx.beginPath(); ctx.setLineDash([5,3]);
-    ctx.moveTo((secondSeriesValues.length-1)/Math.max(1,(secondSeriesValues.length-1))*canvas.width, y);
-    ctx.lineTo(canvas.width, y);
-    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green-dark');
-    ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
-  }
-}
-
-// ======== Доступ к микрофону (ТОЛЬКО по клику) ========
-async function requestMicrophoneAccess(){
-  try{
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      setStatus('❌ getUserMedia не поддерживается в этом окружении.', 'error');
-      return;
-    }
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation:true, noiseSuppression:true }, video:false });
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 2048;
-    source = audioCtx.createMediaStreamSource(micStream);
-    source.connect(analyser);
-    setStatus('✅ Доступ к микрофону получен.', 'ok');
-  }catch(e){
-    setStatus('❌ Доступ к микрофону отклонён или недоступен: '+ e.message, 'error');
-  }
-}
-
-// ======== Запись/анализ ========
-let intensityValues = [];
-let integralValues = [];
-function resetData(){
-  intensityValues = [];
-  integralValues = [];
-  ctx.clearRect(0,0,canvas.width, canvas.height);
-  setStatus('Данные сброшены.');
-}
-
-function rms(buf){
-  let acc = 0;
-  for (let i=0;i<buf.length;i++){ const v=buf[i]; acc += v*v; }
-  return Math.sqrt(acc/(buf.length || 1));
-}
-
-function tick(){
-  if (!recording) return;
-  const mode = getMode();
-
-  const buffer = new Float32Array(analyser.fftSize);
-  analyser.getFloatTimeDomainData(buffer);
-  // Интенсивность ~ RMS^2, условные единицы
-  const r = rms(buffer);
-  const intensity = r*r;
-  const t = audioCtx.currentTime; // сек
-  const dt = Math.max(0, t - lastT);
-  lastT = t;
-
-  // накапливаем интеграл
-  const lastIntegral = integralValues.length ? integralValues[integralValues.length-1] : 0;
-  const nextIntegral = lastIntegral + intensity * dt; // условные Вт·с/м²
-  intensityValues.push(intensity);
-  integralValues.push(nextIntegral);
-
-  if (mode==='normalization'){
-    drawGraph(intensityValues, integralValues, false);
-  } else {
-    const ref = getNormalizationReference();
-    if (ref){
-      const normalized = integralValues.map(v => v / ref); // может быть >1 и <1
-      drawGraph(intensityValues, normalized, true);
-    } else {
-      drawGraph(intensityValues, integralValues, false); // fallback, если нет эталона
-    }
-  }
-
-  rafId = requestAnimationFrame(tick);
-}
-
-function stopRecordingAndFinalize(){
-  recording = false;
-  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
-
-  // Сохраняем асимптоту
-  const lastIntegral = integralValues.length ? integralValues[integralValues.length-1] : 0;
-  const mode = getMode();
-  if (mode==='normalization'){
-    addEnergyHistoryEntry(lastIntegral);
-  } else {
-    const ref = getNormalizationReference();
-    if (ref){
-      const lastNorm = lastIntegral / ref;
-      addEnergyHistoryEntryMain(lastNorm);
-    }
-  }
+// ======== Сброс последнего ========
+function removeLastHistoryEntry(){
+  const mode=getMode();
+  if(mode==='main'){const h=loadEnergyHistoryMain(); if(!h.length){setStatus('История основного режима пуста.','warn');return;} h.pop(); saveEnergyHistoryMain(h); setStatus('Удалена последняя запись основного режима.','ok');}
+  else{const h=loadEnergyHistory(); if(!h.length){setStatus('История нормирования пуста.','warn');return;} h.pop(); saveEnergyHistory(h); setStatus('Удалена последняя запись нормирования.','ok');}
   drawEnergyHistory();
-  setStatus('✅ Анализ завершён.', 'ok');
 }
+if(btnResetLast) btnResetLast.addEventListener('click',removeLastHistoryEntry);
 
-// ======== Обработчики кнопок ========
-btnRequestMic.addEventListener('click', async () => {
-  await requestMicrophoneAccess();
-});
+// ======== Основной график ========
+function mapValToY(val,minV,maxV){const h=canvas.height,p=(val-minV)/(maxV-minV||1);return(h-1)-p*(h-1);}
+function drawGraph(intensityValues,secondSeries,isNorm=false){ctx.clearRect(0,0,canvas.width,canvas.height);
+  let maxI=Math.max(...intensityValues)||1, maxS=Math.max(...secondSeries)||1;
+  const maxIfs=maxI*1.05,maxSfs=maxS*1.1;
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); for(let i=0;i<=5;i++){const y=mapValToY(maxIfs*i/5,0,maxIfs);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes');ctx.beginPath();ctx.moveTo(0,canvas.height-1);ctx.lineTo(canvas.width,canvas.height-1);ctx.moveTo(0,0);ctx.lineTo(0,canvas.height);ctx.stroke();
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text');ctx.font='12px Arial';ctx.textAlign='left';for(let i=0;i<=5;i++){const v=maxIfs*i/5,y=mapValToY(v,0,maxIfs);ctx.fillText(v.toExponential(2),5,y-3);}ctx.save();ctx.rotate(-Math.PI/2);ctx.fillText('Интенсивность (усл. ед.)',-canvas.height+10,14);ctx.restore();
+  ctx.textAlign='right';for(let i=0;i<=5;i++){const v=maxSfs*i/5,y=mapValToY(v,0,maxSfs);ctx.fillText(isNorm?v.toFixed(2):v.toExponential(2),canvas.width-5,y-3);}ctx.save();ctx.rotate(Math.PI/2);ctx.fillText(isNorm?'Нормированная энергия (отн.)':'Энергия (Вт·с/м² — усл.)',canvas.height/2-60,canvas.width-10);ctx.restore();
+  ctx.beginPath();for(let i=0;i<intensityValues.length;i++){const x=(i/Math.max(intensityValues.length-1,1))*canvas.width;const y=mapValToY(intensityValues[i],0,maxIfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--blue');ctx.lineWidth=2;ctx.stroke();
+  ctx.beginPath();for(let i=0;i<secondSeries.length;i++){const x=(i/Math.max(secondSeries.length-1,1))*canvas.width;const y=mapValToY(secondSeries[i],0,maxSfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green');ctx.lineWidth=2;ctx.stroke();}
 
-btnStart.addEventListener('click', async () => {
-  try{
-    if (!micStream){
-      await requestMicrophoneAccess();
-      if (!micStream) return; // доступ не получен
-    }
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
+// ======== Микрофон ========
+async function requestMicrophoneAccess(){try{micStream=await navigator.mediaDevices.getUserMedia({audio:true}); if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser();analyser.fftSize=2048;source=audioCtx.createMediaStreamSource(micStream);source.connect(analyser);setStatus('✅ Доступ к микрофону получен.','ok');}catch(e){setStatus('❌ Нет доступа к микрофону: '+e.message,'error');}}
 
-    // подготовка данных
-    intensityValues = [];
-    integralValues = [];
-    t0 = audioCtx.currentTime;
-    lastT = t0;
-    recording = true;
-    setStatus('🟢 Запись запущена. Говорите/дышите в микрофон...', 'ok');
-    tick();
-  }catch(e){
-    setStatus('❌ Не удалось начать запись: '+e.message, 'error');
-  }
-});
+// ======== Запись ========
+let intensityValues=[], integralValues=[];
+function rms(b){let a=0;for(let v of b)a+=v*v;return Math.sqrt(a/(b.length||1));}
+function tick(){if(!recording)return;const buf=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(buf);const r=rms(buf),int=r*r;const t=audioCtx.currentTime,dt=Math.max(0,t-lastT);lastT=t;const last=integralValues.length?integralValues[integralValues.length-1]:0;const next=last+int*dt;intensityValues.push(int);integralValues.push(next);
+  const mode=getMode();if(mode==='normalization'){drawGraph(intensityValues,integralValues,false);}else{const ref=getNormalizationReference();if(ref){const norm=integralValues.map(v=>v/ref);drawGraph(intensityValues,norm,true);}else{drawGraph(intensityValues,integralValues,false);}}rafId=requestAnimationFrame(tick);}
+function stopRecordingAndFinalize(){recording=false;if(rafId)cancelAnimationFrame(rafId);const last=integralValues.length?integralValues[integralValues.length-1]:0;const mode=getMode();if(mode==='normalization'){addEnergyHistoryEntry(last);}else{const ref=getNormalizationReference();if(ref){addEnergyHistoryEntryMain(last/ref);}}drawEnergyHistory();setStatus('✅ Анализ завершён.','ok');}
 
-btnStop.addEventListener('click', () => {
-  stopRecordingAndFinalize();
-});
+// ======== Кнопки ========
+btnRequestMic.addEventListener('click',()=>{requestMicrophoneAccess();});
+btnStart.addEventListener('click',async()=>{if(!micStream)await requestMicrophoneAccess();if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();intensityValues=[];integralValues=[];t0=audioCtx.currentTime;lastT=t0;recording=true;setStatus('🟢 Запись запущена.','ok');tick();});
+btnStop.addEventListener('click',()=>{stopRecordingAndFinalize();});
+btnReset.addEventListener('click',()=>{intensityValues=[];integralValues=[];ctx.clearRect(0,0,canvas.width,canvas.height);setStatus('Сброс данных.');});
+btnStartNorm.addEventListener('click',()=>{setMode('normalization');setStatus('🟡 Режим нормирования.','ok');});
+btnFinishNorm.addEventListener('click',()=>{setMode('main');const ref=getNormalizationReference();if(!ref)setStatus('⚠️ Нет эталона нормирования.','warn');else setStatus('🟢 Нормирование завершено.','ok');});
 
-btnReset.addEventListener('click', () => {
-  resetData();
-});
-
-btnStartNorm.addEventListener('click', () => {
-  setMode('normalization');
-  setStatus('🟡 Режим "Нормирование" активирован.', 'ok');
-});
-
-btnFinishNorm.addEventListener('click', () => {
-  setMode('main');
-  const ref = getNormalizationReference();
-  if (!ref){
-    setStatus('⚠️ Нет эталона нормирования — выполните хотя бы один сеанс в режиме нормирования.', 'warn');
-  } else {
-    setStatus('🟢 Нормирование завершено. Эталон установлен. Переход к основному режиму.', 'ok');
-  }
-});
-
-// ======== Инициализация ========
-window.addEventListener('load', () => {
-  applyMode();
-  drawEnergyHistory();
-  setStatus('Готов. Сначала нажмите «Разрешить доступ к микрофону».', 'ok');
-});
+// ======== Init ========
+window.addEventListener('load',()=>{applyMode();drawEnergyHistory();setStatus('Готов.','ok');});
 </script>
 </body>
 </html>
