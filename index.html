@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8" />
-<title>Акустический анализ — Нормирование / Основной режим</title>
+<title>Acoustic Analysis — Normalization / Main</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <style>
   :root{
@@ -17,7 +17,7 @@
     --error:#b00020;
   }
   body{font-family:Arial, sans-serif; margin:0; background:#fff; color:#111;}
-  header{padding:10px 12px; border-bottom:1px solid #ddd; background:#fafafa}
+  header{position:relative; padding:10px 12px; border-bottom:1px solid #ddd; background:#fafafa}
   h1{font-size:18px; margin:4px 0;}
   main{padding:8px 0 18px;}
   .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin:8px 12px;}
@@ -33,21 +33,21 @@
   .status.ok{color:var(--ok)} .status.warn{color:var(--warn)} .status.error{color:var(--error)}
   canvas{border:1px solid #ddd; border-radius:6px; margin:8px 12px;}
   .hint{font-size:12px; color:#555; margin:0 12px 12px;}
+  #langBox{position:absolute; right:12px; top:10px;}
+  #langSelect{padding:6px 10px; border-radius:6px; border:1px solid #ccc;}
 </style>
 </head>
 <body>
 <header>
   <h1 id="titleText">Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»</h1>
-
-  <div style="position:absolute; right:12px; top:10px;">
-    <select id="langSelect" style="padding:6px 10px; border-radius:6px; border:1px solid #ccc;">
+  <div id="langBox">
+    <select id="langSelect">
       <option value="ru">Русский</option>
       <option value="en">English</option>
       <option value="he">עברית</option>
     </select>
   </div>
 </header>
-
 
 <main>
   <!-- Панель режимов -->
@@ -68,7 +68,7 @@
   <div class="status" id="status">Готов.</div>
 
   <!-- Основной график -->
-  <canvas id="mainGraph" width="980" height="320"></canvas>
+  <canvas id="mainGraph" width="980" height="340"></canvas>
 
   <!-- История текущего режима -->
   <section id="historySection" class="card">
@@ -82,140 +82,16 @@
 </main>
 
 <script>
-// ======== Глобальные переменные ========
-let audioCtx=null, micStream=null, analyser=null, source=null, rafId=null;
-let recording=false, t0=0, lastT=0;
-const MODE_KEY='analysisModeV1';
-const ENERGY_HISTORY_KEY='energyHistoryV1';
-const ENERGY_HISTORY_MAIN_KEY='energyHistoryMainV1';
-const modeBadge=document.getElementById('modeBadge');
-const statusEl=document.getElementById('status');
-const canvas=document.getElementById('mainGraph'), ctx=canvas.getContext('2d');
-const historyCanvas=document.getElementById('historyGraph'), hctx=historyCanvas.getContext('2d');
-const btnRequestMic=document.getElementById('btnRequestMic');
-const btnStart=document.getElementById('btnStart');
-const btnStop=document.getElementById('btnStop');
-const btnReset=document.getElementById('btnReset');
-const btnStartNorm=document.getElementById('btnStartNorm');
-const btnFinishNorm=document.getElementById('btnFinishNorm');
-const btnResetLast=document.getElementById('btnResetLast');
-
-// ======== Утилиты статуса ========
-function setStatus(msg, level='ok'){ statusEl.className='status '+(level||'ok'); statusEl.textContent=msg; }
-
-// ======== Режимы ========
-function getMode(){const v=localStorage.getItem(MODE_KEY); return (v==='main'||v==='normalization')?v:'normalization';}
-function setMode(v){localStorage.setItem(MODE_KEY,v); applyMode();}
-function applyMode(){const mode=getMode(); document.body.setAttribute('data-mode',mode); modeBadge.textContent='Режим: '+(mode==='normalization'?'Нормирование':'Основной анализ'); drawEnergyHistory();}
-
-// ======== Истории ========
-function loadEnergyHistory(){try{const r=localStorage.getItem(ENERGY_HISTORY_KEY); return r?JSON.parse(r):[]}catch{return[]}}
-function saveEnergyHistory(a){try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.stringify(a))}catch{}}
-function addEnergyHistoryEntry(e){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h);}
-function loadEnergyHistoryMain(){try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[]}catch{return[]}}
-function saveEnergyHistoryMain(a){try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a))}catch{}}
-function addEnergyHistoryEntryMain(n){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h);}
-function getNormalizationReference(){const h=loadEnergyHistory(); if(!h.length)return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
-
-// ======== График истории ========
-function drawEnergyHistory(){
-  const mode=getMode(), isMain=(mode==='main');
-  const data=isMain?loadEnergyHistoryMain():loadEnergyHistory();
-  hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
-  if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?'История основного режима пуста.':'История нормирования пуста.',20,30);return;}
-  const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
-  const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
-  hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
-  for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
-  hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
-  hctx.fillStyle='#000';hctx.font='12px Arial';hctx.fillText('№ сеанса / время',leftPad+W/2-60,topPad+H+22);hctx.save();hctx.rotate(-Math.PI/2);hctx.fillText(isMain?'Нормированная асимптота (отн.)':'Интегральная энергия (Вт·с/м²)',-topPad-H/2-80,15);hctx.restore();
-  hctx.beginPath(); const N=data.length; for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); if(i===0)hctx.moveTo(x,y); else hctx.lineTo(x,y);} hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
-  hctx.fillStyle='#111';hctx.font='10px Arial';const step=Math.ceil(N/8); for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
-}
-
-// ======== Сброс последнего ========
-function removeLastHistoryEntry(){
-  const mode=getMode();
-  if(mode==='main'){const h=loadEnergyHistoryMain(); if(!h.length){setStatus('История основного режима пуста.','warn');return;} h.pop(); saveEnergyHistoryMain(h); setStatus('Удалена последняя запись основного режима.','ok');}
-  else{const h=loadEnergyHistory(); if(!h.length){setStatus('История нормирования пуста.','warn');return;} h.pop(); saveEnergyHistory(h); setStatus('Удалена последняя запись нормирования.','ok');}
-  drawEnergyHistory();
-}
-if(btnResetLast) btnResetLast.addEventListener('click',removeLastHistoryEntry);
-
-// ======== Основной график ========
-function mapValToY(val,minV,maxV){const h=canvas.height,p=(val-minV)/(maxV-minV||1);return(h-1)-p*(h-1);}
-function drawGraph(intensityValues,secondSeries,isNorm=false){ctx.clearRect(0,0,canvas.width,canvas.height);
-  
-// --- Вертикальная секундная сетка по оси времени ---
-try {
-  const totalTime = Math.max((typeof lastT !== 'undefined' && typeof t0 !== 'undefined') ? (lastT - t0) : 0, 0);
-  if (totalTime > 0.001) {
-    const secs = Math.floor(totalTime);
-    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#e9e9e9';
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-    for (let s = 0; s <= secs; s++) {
-      const x = (s / totalTime) * canvas.width;
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-      if (s % 5 === 0) {
-        ctx.save();
-        ctx.strokeStyle = gridColor;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-        ctx.restore();
-      }
-      ctx.fillStyle = '#555';
-      ctx.font = '11px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText(String(s), x, canvas.height - 4);
-    }
-    ctx.textAlign = 'left';
-  }
-} catch(e) {}
-let maxI=Math.max(...intensityValues)||1, maxS=Math.max(...secondSeries)||1;
-  const maxIfs=maxI*1.05,maxSfs=maxS*1.1;
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); for(let i=0;i<=5;i++){const y=mapValToY(maxIfs*i/5,0,maxIfs);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes');ctx.beginPath();ctx.moveTo(0,canvas.height-1);ctx.lineTo(canvas.width,canvas.height-1);ctx.moveTo(0,0);ctx.lineTo(0,canvas.height);ctx.stroke();
-  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text');ctx.font='12px Arial';ctx.textAlign='left';for(let i=0;i<=5;i++){const v=maxIfs*i/5,y=mapValToY(v,0,maxIfs);ctx.fillText(v.toExponential(2),5,y-3);}ctx.save();ctx.rotate(-Math.PI/2);ctx.fillText('Интенсивность (усл. ед.)',-canvas.height+10,14);ctx.restore();
-  ctx.textAlign='right';for(let i=0;i<=5;i++){const v=maxSfs*i/5,y=mapValToY(v,0,maxSfs);ctx.fillText(isNorm?v.toFixed(2):v.toExponential(2),canvas.width-5,y-3);}ctx.save();ctx.rotate(Math.PI/2);ctx.fillText(isNorm?'Нормированная энергия (отн.)':'Энергия (Вт·с/м² — усл.)',canvas.height/2-60,canvas.width-10);ctx.restore();
-  ctx.beginPath();for(let i=0;i<intensityValues.length;i++){const x=(i/Math.max(intensityValues.length-1,1))*canvas.width;const y=mapValToY(intensityValues[i],0,maxIfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--blue');ctx.lineWidth=2;ctx.stroke();
-  ctx.beginPath();for(let i=0;i<secondSeries.length;i++){const x=(i/Math.max(secondSeries.length-1,1))*canvas.width;const y=mapValToY(secondSeries[i],0,maxSfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green');ctx.lineWidth=2;ctx.stroke();}
-
-// ======== Микрофон ========
-async function requestMicrophoneAccess(){try{micStream=await navigator.mediaDevices.getUserMedia({audio:true}); if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); analyser=audioCtx.createAnalyser();analyser.fftSize=2048;source=audioCtx.createMediaStreamSource(micStream);source.connect(analyser);setStatus('✅ Доступ к микрофону получен.','ok');}catch(e){setStatus('❌ Нет доступа к микрофону: '+e.message,'error');}}
-
-// ======== Запись ========
-let intensityValues=[], integralValues=[];
-function rms(b){let a=0;for(let v of b)a+=v*v;return Math.sqrt(a/(b.length||1));}
-function tick(){if(!recording)return;const buf=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(buf);const r=rms(buf),int=r*r;const t=audioCtx.currentTime,dt=Math.max(0,t-lastT);lastT=t;const last=integralValues.length?integralValues[integralValues.length-1]:0;const next=last+int*dt;intensityValues.push(int);integralValues.push(next);
-  const mode=getMode();if(mode==='normalization'){drawGraph(intensityValues,integralValues,false);}else{const ref=getNormalizationReference();if(ref){const norm=integralValues.map(v=>v/ref);drawGraph(intensityValues,norm,true);}else{drawGraph(intensityValues,integralValues,false);}}rafId=requestAnimationFrame(tick);}
-function stopRecordingAndFinalize(){recording=false;if(rafId)cancelAnimationFrame(rafId);const last=integralValues.length?integralValues[integralValues.length-1]:0;const mode=getMode();if(mode==='normalization'){addEnergyHistoryEntry(last);}else{const ref=getNormalizationReference();if(ref){addEnergyHistoryEntryMain(last/ref);}}drawEnergyHistory();setStatus('✅ Анализ завершён.','ok');}
-
-// ======== Кнопки ========
-btnRequestMic.addEventListener('click',()=>{requestMicrophoneAccess();});
-btnStart.addEventListener('click',async()=>{if(!micStream)await requestMicrophoneAccess();if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();intensityValues=[];integralValues=[];t0=audioCtx.currentTime;lastT=t0;recording=true;setStatus('🟢 Запись запущена.','ok');tick();});
-btnStop.addEventListener('click',()=>{stopRecordingAndFinalize();});
-btnReset.addEventListener('click',()=>{intensityValues=[];integralValues=[];ctx.clearRect(0,0,canvas.width,canvas.height);setStatus('Сброс данных.');});
-btnStartNorm.addEventListener('click',()=>{setMode('normalization');setStatus('🟡 Режим нормирования.','ok');});
-btnFinishNorm.addEventListener('click',()=>{setMode('main');const ref=getNormalizationReference();if(!ref)setStatus('⚠️ Нет эталона нормирования.','warn');else setStatus('🟢 Нормирование завершено.','ok');});
-
-// ======== Init ========
-window.addEventListener('load',()=>{applyMode();drawEnergyHistory();setStatus('Готов.','ok');});
-</script>
-
-<script>
+/* ===== I18N: RU / EN / HE ===== */
 const LANG_KEY='ui_lang_v1';
+function currLang(){ return localStorage.getItem(LANG_KEY)||'ru'; }
 const translations={
-  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов."},
-  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready."},
-  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן."}
+  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима."},
+  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted."},
+  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענשה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusNormOn:"🟡 מצב נרמול.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי."}
 };
+function tr(key){ try{ return (translations[currLang()]||translations.ru)[key] || key; }catch(e){ return key; } }
+function setStatus(msg, level='ok'){ const el=document.getElementById('status'); el.className='status '+(level||'ok'); el.textContent=msg; }
 function textMatches(el,vars){const t=(el.textContent||'').trim();return vars.some(v=>v===t);}
 function findOrBindButton(id,keys){let el=document.getElementById(id);if(el)return el;const btns=Array.from(document.querySelectorAll('button'));for(const b of btns){if(textMatches(b,keys)){b.id=id;return b;}}return null;}
 function applyTranslations(lang){
@@ -230,18 +106,218 @@ function applyTranslations(lang){
   const b7=findOrBindButton('btnResetLast',[translations.ru.resetLast,translations.en.resetLast,translations.he.resetLast]); if(b7) b7.textContent=t.resetLast;
   const h1=document.querySelector('#historySection h3'); if(h1) h1.textContent=t.historyTitle;
   const hh=document.querySelector('#historySection .hint'); if(hh) hh.textContent=t.historyHint;
+
+  // RTL/LTR + persist
   document.body.dir=(lang==='he')?'rtl':'ltr';
   localStorage.setItem(LANG_KEY,lang);
+
+  // ✅ мгновенно обновляем бейдж режима и историю (легенды)
+  try { modeBadge.textContent = (getMode()==='normalization') ? tr('modeBadgeNorm') : tr('modeBadgeMain'); } catch(e){}
+  try { drawEnergyHistory(); } catch(e){}
+
+  // статус "готов"
   try{ setStatus(t.ready,'ok'); }catch(e){}
 }
 function initI18n(){
   const sel=document.getElementById('langSelect'); if(!sel) return;
   const saved=localStorage.getItem(LANG_KEY)||'ru';
   sel.value=saved; applyTranslations(saved);
-  sel.addEventListener('change',e=>applyTranslations(e.target.value));
+  sel.addEventListener('change',e=>{
+    applyTranslations(e.target.value);          // уже обновляет бейдж + историю
+    try{ drawEnergyHistory(); }catch(_){}
+  });
 }
-window.addEventListener('load', initI18n);
-</script>
 
+/* ===== Глобальные переменные / режимы ===== */
+let audioCtx=null, micStream=null, analyser=null, source=null, rafId=null;
+let recording=false, t0=0, lastT=0;
+const MODE_KEY='analysisModeV1';
+const ENERGY_HISTORY_KEY='energyHistoryV1';
+const ENERGY_HISTORY_MAIN_KEY='energyHistoryMainV1';
+const modeBadge=document.getElementById('modeBadge');
+const canvas=document.getElementById('mainGraph'), ctx=canvas.getContext('2d');
+const historyCanvas=document.getElementById('historyGraph'), hctx=historyCanvas.getContext('2d');
+const btnRequestMic=document.getElementById('btnRequestMic');
+const btnStart=document.getElementById('btnStart');
+const btnStop=document.getElementById('btnStop');
+const btnReset=document.getElementById('btnReset');
+const btnStartNorm=document.getElementById('btnStartNorm');
+const btnFinishNorm=document.getElementById('btnFinishNorm');
+const btnResetLast=document.getElementById('btnResetLast');
+
+function getMode(){const v=localStorage.getItem(MODE_KEY); return (v==='main'||v==='normalization')?v:'normalization';}
+function setMode(v){localStorage.setItem(MODE_KEY,v); applyMode();}
+function applyMode(){const mode=getMode(); modeBadge.textContent=(mode==='normalization')?tr('modeBadgeNorm'):tr('modeBadgeMain'); document.body.setAttribute('data-mode',mode); drawEnergyHistory();}
+
+/* ===== Истории ===== */
+function loadEnergyHistory(){try{const r=localStorage.getItem(ENERGY_HISTORY_KEY); return r?JSON.parse(r):[]}catch{return[]}}
+function saveEnergyHistory(a){try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.stringify(a))}catch{}}
+function addEnergyHistoryEntry(e){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h);}
+function loadEnergyHistoryMain(){try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[]}catch{return[]}}
+function saveEnergyHistoryMain(a){try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a))}catch{}}
+function addEnergyHistoryEntryMain(n){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h);}
+function getNormalizationReference(){const h=loadEnergyHistory(); if(!h.length)return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
+
+/* ===== История: график ===== */
+function drawEnergyHistory(){
+  const mode=getMode(), isMain=(mode==='main');
+  const data=isMain?loadEnergyHistoryMain():loadEnergyHistory();
+  hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
+  if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?tr('statusHistEmptyMain'):tr('statusHistEmptyNorm'),20,30);return;}
+  const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
+  const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
+  hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
+  for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
+  hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
+  hctx.fillStyle='#000';hctx.font='12px Arial';hctx.fillText(tr('histX'),leftPad+W/2-60,topPad+H+22);hctx.save();hctx.rotate(-Math.PI/2);hctx.fillText(isMain?tr('histYNorm'):tr('histYAbs'),-topPad-H/2-80,15);hctx.restore();
+  hctx.beginPath(); const N=data.length; for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); if(i===0)hctx.moveTo(x,y); else hctx.lineTo(x,y);} hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
+  hctx.fillStyle='#111';hctx.font='10px Arial';const step=Math.ceil(N/8); for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
+}
+
+/* ===== Сброс последнего (с автоповтором) ===== */
+function removeLastHistoryEntry(){
+  const mode=getMode();
+  if(mode==='main'){const h=loadEnergyHistoryMain(); if(!h.length){setStatus(tr('statusHistEmptyMain'),'warn');return;} h.pop(); saveEnergyHistoryMain(h); setStatus(tr('statusHistDelMain'),'ok');}
+  else{const h=loadEnergyHistory(); if(!h.length){setStatus(tr('statusHistEmptyNorm'),'warn');return;} h.pop(); saveEnergyHistory(h); setStatus(tr('statusHistDelNorm'),'ok');}
+  drawEnergyHistory();
+}
+if(btnResetLast) btnResetLast.addEventListener('click',removeLastHistoryEntry);
+let _resetHoldTimer=null, _resetRepeatTimer=null; const _initialDelayMs=600, _repeatEveryMs=250;
+function _startResetAutoRepeat(){ if(_resetHoldTimer||_resetRepeatTimer) return; _resetHoldTimer=setTimeout(()=>{ removeLastHistoryEntry(); _resetRepeatTimer=setInterval(removeLastHistoryEntry,_repeatEveryMs); }, _initialDelayMs); }
+function _stopResetAutoRepeat(){ if(_resetHoldTimer){clearTimeout(_resetHoldTimer);_resetHoldTimer=null;} if(_resetRepeatTimer){clearInterval(_resetRepeatTimer);_resetRepeatTimer=null;} }
+if(btnResetLast){ btnResetLast.addEventListener('mousedown',e=>{ if(e.button===0) _startResetAutoRepeat();}); window.addEventListener('mouseup',_stopResetAutoRepeat); btnResetLast.addEventListener('mouseleave',_stopResetAutoRepeat); btnResetLast.addEventListener('touchstart',e=>{e.preventDefault();_startResetAutoRepeat();},{passive:false}); window.addEventListener('touchend',_stopResetAutoRepeat); window.addEventListener('touchcancel',_stopResetAutoRepeat); btnResetLast.addEventListener('contextmenu',e=>e.preventDefault());}
+
+/* ===== Основной график + секундная сетка ===== */
+function mapValToY(val,minV,maxV){const h=canvas.height,p=(val-minV)/(maxV-minV||1);return(h-1)-p*(h-1);}
+function drawGraph(intensityValues,secondSeries,isNorm=false){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // сек. сетка по X
+  try{
+    const totalTime = Math.max((typeof lastT!=='undefined' && typeof t0!=='undefined') ? (lastT - t0) : 0, 0);
+    if (totalTime > 0.001){
+      const secs = Math.floor(totalTime);
+      const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#e9e9e9';
+      ctx.strokeStyle = gridColor;
+      ctx.lineWidth = 1;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#555';
+      ctx.font = '11px Arial';
+      for (let s=0; s<=secs; s++){
+        const x = (s / totalTime) * canvas.width;
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        if (s % 5 === 0){ ctx.save(); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); ctx.restore(); }
+        ctx.fillText(String(s), x, canvas.height - 6);
+      }
+      ctx.textAlign = 'left';
+    }
+  }catch(e){}
+
+  // шкалы
+  let maxI=Math.max(...intensityValues)||1, maxS=Math.max(...secondSeries)||1;
+  const maxIfs=maxI*1.05, maxSfs=maxS*1.1;
+
+  // горизонтальная сетка по интенсивности
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid');
+  for(let i=0;i<=5;i++){const y=mapValToY(maxIfs*i/5,0,maxIfs);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
+
+  // оси
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes');ctx.beginPath();ctx.moveTo(0,canvas.height-1);ctx.lineTo(canvas.width,canvas.height-1);ctx.moveTo(0,0);ctx.lineTo(0,canvas.height);ctx.stroke();
+
+  // подписи левой оси (интенсивность)
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text');ctx.font='12px Arial';ctx.textAlign='left';
+  for(let i=0;i<=5;i++){const v=maxIfs*i/5,y=mapValToY(v,0,maxIfs);ctx.fillText(v.toExponential(2),5,y-3);}
+  ctx.save();ctx.rotate(-Math.PI/2);ctx.fillText(tr('yLeft'),-canvas.height+10,14);ctx.restore();
+
+  // подписи правой оси (энергия / нормированная)
+  ctx.textAlign='right';
+  for(let i=0;i<=5;i++){const v=maxSfs*i/5,y=mapValToY(v,0,maxSfs);ctx.fillText(isNorm?v.toFixed(2):v.toExponential(2),canvas.width-5,y-3);}
+  ctx.save();ctx.rotate(Math.PI/2);ctx.fillText(isNorm?tr('yRightNorm'):tr('yRightRaw'),canvas.height/2-60,canvas.width-10);ctx.restore();
+
+  // интенсивность
+  ctx.beginPath(); for(let i=0;i<intensityValues.length;i++){const x=(i/Math.max(intensityValues.length-1,1))*canvas.width;const y=mapValToY(intensityValues[i],0,maxIfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--blue');ctx.lineWidth=2;ctx.stroke();
+
+  // вторая кривая
+  ctx.beginPath(); for(let i=0;i<secondSeries.length;i++){const x=(i/Math.max(secondSeries.length-1,1))*canvas.width;const y=mapValToY(secondSeries[i],0,maxSfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green');ctx.lineWidth=2;ctx.stroke();
+
+  // горизонтальная направляющая по последнему значению
+  if (secondSeries.length>1){
+    const last = secondSeries[secondSeries.length-1];
+    const y = mapValToY(last, 0, maxSfs);
+    ctx.beginPath(); ctx.setLineDash([5,3]); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
+    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green-dark'); ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
+  }
+}
+
+/* ===== Микрофон ===== */
+async function requestMicrophoneAccess(){
+  try{
+    micStream=await navigator.mediaDevices.getUserMedia({audio:true});
+    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=2048; source=audioCtx.createMediaStreamSource(micStream); source.connect(analyser);
+    setStatus(tr('statusMicOk'),'ok');
+  }catch(e){ setStatus(tr('statusMicErr')+e.message,'error'); }
+}
+
+/* ===== Запись ===== */
+let intensityValues=[], integralValues=[];
+function rms(b){let a=0;for(let v of b)a+=v*v;return Math.sqrt(a/(b.length||1));}
+function tick(){
+  if(!recording) return;
+  const buffer=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(buffer);
+  const r=rms(buffer), intensity=r*r;
+  const t=audioCtx.currentTime, dt=Math.max(0,t-lastT); lastT=t;
+  const last=(integralValues.length?integralValues[integralValues.length-1]:0);
+  const next=last+intensity*dt;
+  intensityValues.push(intensity); integralValues.push(next);
+
+  const mode=getMode();
+  if(mode==='normalization'){
+    drawGraph(intensityValues, integralValues, false);
+  }else{
+    const ref=getNormalizationReference();
+    if(ref){
+      const norm=integralValues.map(v=>v/ref);
+      drawGraph(intensityValues, norm, true);
+    }else{
+      // fallback: самонормирование текущей кривой (асимптота → 1)
+      const lastNow = integralValues.length ? integralValues[integralValues.length-1] : 1;
+      const norm=integralValues.map(v=>v/(lastNow||1));
+      drawGraph(intensityValues, norm, true);
+    }
+  }
+  rafId=requestAnimationFrame(tick);
+}
+
+function stopRecordingAndFinalize(){
+  recording=false; if(rafId) cancelAnimationFrame(rafId);
+  const last = integralValues.length?integralValues[integralValues.length-1]:0;
+  const mode=getMode();
+  if(mode==='normalization'){
+    addEnergyHistoryEntry(last);
+  }else{
+    const ref=getNormalizationReference();
+    if(ref){
+      addEnergyHistoryEntryMain(last/ref);
+    }else{
+      // история нормирования пуста → сохраняем 1 (если была запись) или 0
+      addEnergyHistoryEntryMain(last>0 ? 1 : 0);
+    }
+  }
+  drawEnergyHistory();
+  setStatus(tr('statusMainDone'),'ok');
+}
+
+/* ===== Кнопки ===== */
+btnRequestMic.addEventListener('click',()=>{requestMicrophoneAccess();});
+btnStart.addEventListener('click',async()=>{if(!micStream)await requestMicrophoneAccess();if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();if(audioCtx.state==='suspended')await audioCtx.resume();intensityValues=[];integralValues=[];t0=audioCtx.currentTime;lastT=t0;recording=true;setStatus(tr('statusRec'),'ok');tick();});
+btnStop.addEventListener('click',()=>{stopRecordingAndFinalize();});
+btnReset.addEventListener('click',()=>{intensityValues=[];integralValues=[];ctx.clearRect(0,0,canvas.width,canvas.height);setStatus(tr('statusReset'));});
+btnStartNorm.addEventListener('click',()=>{setMode('normalization');setStatus(tr('statusNormOn'),'ok');});
+btnFinishNorm.addEventListener('click',()=>{setMode('main');const ref=getNormalizationReference();if(!ref)setStatus(tr('statusMainOnNoRef'),'warn');else setStatus(tr('statusMainOn'),'ok');});
+
+/* ===== Init ===== */
+window.addEventListener('load',()=>{applyMode();drawEnergyHistory();initI18n();setStatus(translations[currLang()].ready,'ok');});
+</script>
 </body>
 </html>
