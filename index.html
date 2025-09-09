@@ -38,6 +38,17 @@
   #langBox{position:absolute; right:12px; top:10px;}
   #langSelect{padding:6px 10px; border-radius:6px; border:1px solid #ccc;}
   .signal-info{margin:8px 12px; padding:8px; background:#f9f9f9; border-radius:6px; font-family:monospace; font-size:13px;}
+
+.low-signal-warning {
+  color: #b00020;
+  font-weight: bold;
+  font-size: 16px;
+  animation: blink 1s step-start infinite;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
 </style>
 </head>
 <body>
@@ -112,7 +123,7 @@ function applyTranslations(lang){
   const b7=findOrBindButton('btnResetLast',[translations.ru.resetLast,translations.en.resetLast,translations.he.resetLast]); if(b7) b7.textContent=t.resetLast;
   const h1=document.querySelector('#historySection h3'); if(h1) h1.textContent=t.historyTitle;
   const hh=document.querySelector('#historySection .hint'); if(hh) hh.textContent=t.historyHint;
-  const si=document.getElementById('signalInfo'); if(si && !si.textContent.includes(':')) si.textContent=t.signalInfo;
+  const si=document.getElementById('signalInfo'); if(si && !si.textContent.includes(':') && !(si.innerHTML||'').includes('low-signal-warning')) si.textContent=t.signalInfo;
 
   // RTL/LTR + persist
   document.body.dir=(lang==='he')?'rtl':'ltr';
@@ -242,12 +253,16 @@ function detectSignal(intensity, currentIntegral, currentTime) {
 function updateSignalInfo() {
   if (signalStartTime !== null && signalEndTime !== null) {
     const duration = signalEndTime - signalStartTime;
-    signalInfoEl.textContent = `Начало: ${signalStartTime.toFixed(2)} с, Конец: ${signalEndTime.toFixed(2)} с, Длительность: ${duration.toFixed(2)} с`;
-  } else if (signalStartTime !== null) {
-    const currentTime = audioCtx ? audioCtx.currentTime - t0 : 0;
-    signalInfoEl.textContent = `Начало: ${signalStartTime.toFixed(2)} с, Конец: — с, Длительность: — с`;
-  } else {
-    signalInfoEl.textContent = tr('signalInfo');
+    signalInfoEl.textContent =
+      `Начало: ${signalStartTime.toFixed(2)} с, Конец: ${signalEndTime.toFixed(2)} с, Длительность: ${duration.toFixed(2)} с`;
+  } else if (signalStartTime !== null && signalEndTime === null) {
+    // начало было, но конца нет → ошибка
+    signalInfoEl.innerHTML = '<span class="low-signal-warning">НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!</span>';
+    setStatus("НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!", "error");
+  } else if (signalStartTime === null && signalEndTime === null) {
+    // вообще нет начала/конца
+    signalInfoEl.innerHTML = '<span class="low-signal-warning">НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!</span>';
+    setStatus("НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!", "warn");
   }
 }
 
