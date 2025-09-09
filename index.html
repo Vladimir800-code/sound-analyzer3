@@ -38,17 +38,46 @@
   #langBox{position:absolute; right:12px; top:10px;}
   #langSelect{padding:6px 10px; border-radius:6px; border:1px solid #ccc;}
   .signal-info{margin:8px 12px; padding:8px; background:#f9f9f9; border-radius:6px; font-family:monospace; font-size:13px;}
-
-.low-signal-warning {
-  color: #b00020;
-  font-weight: bold;
-  font-size: 16px;
-  animation: blink 1s step-start infinite;
-}
-@keyframes blink {
-  50% { opacity: 0; }
-}
-
+  .threshold-info{margin:4px 12px; padding:6px; background:#f0f8ff; border-radius:4px; font-family:monospace; font-size:12px; color:#0066cc;}
+  
+  /* Яркое мигающее предупреждение */
+  .low-intensity-warning {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(45deg, #ff0000, #ff8800);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 15px;
+    font-size: 24px;
+    font-weight: bold;
+    text-align: center;
+    z-index: 1000;
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.7);
+    animation: blinkWarning 0.5s infinite alternate;
+    border: 3px solid #fff;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  }
+  
+  @keyframes blinkWarning {
+    0% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.05);
+      box-shadow: 0 0 40px rgba(255, 0, 0, 0.9);
+    }
+    100% {
+      opacity: 0.8;
+      transform: translate(-50%, -50%) scale(1);
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+    }
+  }
+  
+  .warning-icon {
+    font-size: 32px;
+    margin-bottom: 10px;
+    display: block;
+  }
 </style>
 </head>
 <body>
@@ -80,6 +109,7 @@
   </div>
 
   <div class="status" id="status">Готов.</div>
+  <div class="threshold-info" id="thresholdInfo">Текущий порог: —</div>
 
   <!-- Основной график -->
   <canvas id="mainGraph" width="980" height="340"></canvas>
@@ -98,17 +128,25 @@
   </section>
 </main>
 
+<!-- Яркое мигающее предупреждение -->
+<div id="lowIntensityWarning" class="low-intensity-warning" style="display: none;">
+  <span class="warning-icon">⚠️</span>
+  НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!<br>
+  Увеличьте громкость!
+</div>
+
 <script>
 /* ===== I18N: RU / EN / HE ===== */
 const LANG_KEY='ui_lang_v1';
 function currLang(){ return localStorage.getItem(LANG_KEY)||'ru'; }
 const translations={
-  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с"},
-  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s"},
-  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענשה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusNormOn:"🟡 מצב נרמול.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש"}
+  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",thresholdInfo:"Текущий порог: —"},
+  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s",thresholdInfo:"Current threshold: —"},
+  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מ�נורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusNormOn:"🟡 מצב נרמול.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",thresholdInfo:"סף נוכחי: —"}
 };
 function tr(key){ try{ return (translations[currLang()]||translations.ru)[key] || key; }catch(e){ return key; } }
 function setStatus(msg, level='ok'){ const el=document.getElementById('status'); el.className='status '+(level||'ok'); el.textContent=msg; }
+function setThresholdInfo(msg){ const el=document.getElementById('thresholdInfo'); if(el) el.textContent=msg; }
 function textMatches(el,vars){const t=(el.textContent||'').trim();return vars.some(v=>v===t);}
 function findOrBindButton(id,keys){let el=document.getElementById(id);if(el)return el;const btns=Array.from(document.querySelectorAll('button'));for(const b of btns){if(textMatches(b,keys)){b.id=id;return b;}}return null;}
 function applyTranslations(lang){
@@ -123,7 +161,8 @@ function applyTranslations(lang){
   const b7=findOrBindButton('btnResetLast',[translations.ru.resetLast,translations.en.resetLast,translations.he.resetLast]); if(b7) b7.textContent=t.resetLast;
   const h1=document.querySelector('#historySection h3'); if(h1) h1.textContent=t.historyTitle;
   const hh=document.querySelector('#historySection .hint'); if(hh) hh.textContent=t.historyHint;
-  const si=document.getElementById('signalInfo'); if(si && !si.textContent.includes(':') && !(si.innerHTML||'').includes('low-signal-warning')) si.textContent=t.signalInfo;
+  const si=document.getElementById('signalInfo'); if(si && !si.textContent.includes(':')) si.textContent=t.signalInfo;
+  const ti=document.getElementById('thresholdInfo'); if(ti && !ti.textContent.includes(':')) ti.textContent=t.thresholdInfo;
 
   // RTL/LTR + persist
   document.body.dir=(lang==='he')?'rtl':'ltr';
@@ -156,6 +195,9 @@ let maxIntensity = 0;
 let lastIntegralValue = 0;
 let stableCount = 0;
 let autoStopTimer = null;
+let currentThreshold = 0;
+let lowIntensityWarningActive = false;
+let warningTimeout = null;
 const MODE_KEY='analysisModeV1';
 const ENERGY_HISTORY_KEY='energyHistoryV1';
 const ENERGY_HISTORY_MAIN_KEY='energyHistoryMainV1';
@@ -170,9 +212,11 @@ const btnStartNorm=document.getElementById('btnStartNorm');
 const btnFinishNorm=document.getElementById('btnFinishNorm');
 const btnResetLast=document.getElementById('btnResetLast');
 const signalInfoEl = document.getElementById('signalInfo');
+const lowIntensityWarning = document.getElementById('lowIntensityWarning');
 
 // Параметры для определения сигнала
-const SIGNAL_THRESHOLD = 0.01; // Порог начала сигнала
+const MIN_RELATIVE_THRESHOLD = 0.05; // 5% от макс. интенсивности
+const ABSOLUTE_FLOOR = 0.001; // Нижний абсолютный предел
 const INTEGRAL_STABILITY_THRESHOLD = 0.01; // 1% отклонение от асимптотического значения
 const STABLE_SAMPLES_REQUIRED = 10; // Количество стабильных отсчетов для определения конца
 const AUTO_STOP_AFTER_END = 3.0; // Автостоп через 3 сек после конца сигнала
@@ -181,6 +225,29 @@ const MAX_RECORDING_TIME = 30.0; // Максимальная длительно�
 function getMode(){const v=localStorage.getItem(MODE_KEY); return (v==='main'||v==='normalization')?v:'normalization';}
 function setMode(v){localStorage.setItem(MODE_KEY,v); applyMode();}
 function applyMode(){const mode=getMode(); modeBadge.textContent=(mode==='normalization')?tr('modeBadgeNorm'):tr('modeBadgeMain'); document.body.setAttribute('data-mode',mode); drawEnergyHistory();}
+
+/* ===== Управление мигающим предупреждением ===== */
+function showLowIntensityWarning() {
+  if (!lowIntensityWarningActive) {
+    lowIntensityWarningActive = true;
+    lowIntensityWarning.style.display = 'block';
+    
+    // Автоматическое скрытие через 5 секунд
+    if (warningTimeout) clearTimeout(warningTimeout);
+    warningTimeout = setTimeout(() => {
+      hideLowIntensityWarning();
+    }, 5000);
+  }
+}
+
+function hideLowIntensityWarning() {
+  lowIntensityWarningActive = false;
+  lowIntensityWarning.style.display = 'none';
+  if (warningTimeout) {
+    clearTimeout(warningTimeout);
+    warningTimeout = null;
+  }
+}
 
 /* ===== Автоматическая остановка ===== */
 function checkAutoStop(currentTime) {
@@ -213,12 +280,27 @@ function detectSignal(intensity, currentIntegral, currentTime) {
   // Обновляем максимальную интенсивность
   maxIntensity = Math.max(maxIntensity, intensity);
   
-  // Определяем относительный порог (процент от максимальной интенсивности)
-  const relativeThreshold = maxIntensity * 0.02;
-  const actualThreshold = Math.max(SIGNAL_THRESHOLD, relativeThreshold);
+  // Динамический порог обнаружения (5% от макс. интенсивности, но не ниже ABSOLUTE_FLOOR)
+  const relativeThreshold = Math.max(maxIntensity * MIN_RELATIVE_THRESHOLD, ABSOLUTE_FLOOR);
+  currentThreshold = relativeThreshold;
+  
+  // Обновляем информацию о пороге
+  setThresholdInfo(`Текущий порог: ${relativeThreshold.toExponential(2)} (${(MIN_RELATIVE_THRESHOLD*100).toFixed(0)}% от макс. ${maxIntensity.toExponential(2)})`);
+  
+  // Проверка на низкую интенсивность сигнала
+  if (maxIntensity < ABSOLUTE_FLOOR * 2) {
+    setStatus('⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА! Увеличьте громкость.', 'warn');
+    showLowIntensityWarning();
+  } else {
+    // Сбрасываем предупреждение, если интенсивность нормальная
+    if (document.getElementById('status').textContent.includes('НИЗКАЯ ИНТЕНСИВНОСТЬ')) {
+      setStatus(tr('statusRec'), 'ok');
+    }
+    hideLowIntensityWarning();
+  }
   
   // Определяем начало сигнала
-  if (!isSignalActive && intensity > actualThreshold) {
+  if (!isSignalActive && intensity > relativeThreshold) {
     isSignalActive = true;
     signalStartTime = timeFromStart;
     lastIntegralValue = currentIntegral;
@@ -247,22 +329,30 @@ function detectSignal(intensity, currentIntegral, currentTime) {
     }
   }
   
+  // Защита от повторного начала после конца
+  if (signalEndTime !== null && intensity > relativeThreshold) {
+    // Если сигнал уже закончился, но интенсивность снова превысила порог,
+    // это может быть шумом или новым сигналом - игнорируем для текущей реализации
+    return null;
+  }
+  
   return null;
 }
 
 function updateSignalInfo() {
   if (signalStartTime !== null && signalEndTime !== null) {
     const duration = signalEndTime - signalStartTime;
-    signalInfoEl.textContent =
-      `Начало: ${signalStartTime.toFixed(2)} с, Конец: ${signalEndTime.toFixed(2)} с, Длительность: ${duration.toFixed(2)} с`;
-  } else if (signalStartTime !== null && signalEndTime === null) {
-    // начало было, но конца нет → ошибка
-    signalInfoEl.innerHTML = '<span class="low-signal-warning">НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!</span>';
-    setStatus("НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!", "error");
-  } else if (signalStartTime === null && signalEndTime === null) {
-    // вообще нет начала/конца
-    signalInfoEl.innerHTML = '<span class="low-signal-warning">НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!</span>';
-    setStatus("НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!", "warn");
+    signalInfoEl.textContent = `Начало: ${signalStartTime.toFixed(2)} с, Конец: ${signalEndTime.toFixed(2)} с, Длительность: ${duration.toFixed(2)} с`;
+  } else if (signalStartTime !== null) {
+    const currentTime = audioCtx ? audioCtx.currentTime - t0 : 0;
+    signalInfoEl.textContent = `Начало: ${signalStartTime.toFixed(2)} с, Конец: — с, Длительность: — с`;
+  } else {
+    signalInfoEl.textContent = tr('signalInfo');
+  }
+  
+  // Добавляем предупреждение о низкой интенсивности в информацию о сигнале
+  if (maxIntensity > 0 && maxIntensity < ABSOLUTE_FLOOR * 2) {
+    signalInfoEl.textContent += " ⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ!";
   }
 }
 
@@ -365,22 +455,27 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green-dark'); ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
   }
 
-  // Рисуем маркеры начала и конца сигнала
+  // Рисуем маркеры начала и конца сигнала с улучшенной видимостью
   if (signalStartTime !== null) {
     const totalTime = lastT - t0;
     if (totalTime > 0) {
       const xStart = (signalStartTime / totalTime) * canvas.width;
+      
+      // Улучшенная видимость маркера начала
       ctx.beginPath();
       ctx.setLineDash([5, 3]);
       ctx.moveTo(xStart, 0);
       ctx.lineTo(xStart, canvas.height);
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = 'rgba(255,107,0,0.7)';
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
       
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00';
-      ctx.font = '12px Arial';
+      ctx.font = 'bold 12px Arial';
       ctx.fillText('Начало', xStart + 5, 15);
     }
   }
@@ -389,19 +484,41 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
     const totalTime = lastT - t0;
     if (totalTime > 0) {
       const xEnd = (signalEndTime / totalTime) * canvas.width;
+      
+      // Улучшенная видимость маркера конца
       ctx.beginPath();
       ctx.setLineDash([5, 3]);
       ctx.moveTo(xEnd, 0);
       ctx.lineTo(xEnd, canvas.height);
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = 'rgba(255,0,102,0.7)';
       ctx.stroke();
       ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
       
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066';
-      ctx.font = '12px Arial';
+      ctx.font = 'bold 12px Arial';
       ctx.fillText('Конец', xEnd + 5, 30);
     }
+  }
+  
+  // Рисуем линию порога для наглядности
+  if (currentThreshold > 0) {
+    const yThreshold = mapValToY(currentThreshold, 0, maxIfs);
+    ctx.beginPath();
+    ctx.setLineDash([3, 3]);
+    ctx.moveTo(0, yThreshold);
+    ctx.lineTo(canvas.width, yThreshold);
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    
+    ctx.fillStyle = '#666';
+    ctx.font = '10px Arial';
+    ctx.fillText(`Порог: ${currentThreshold.toExponential(2)}`, 10, yThreshold - 5);
   }
 }
 
@@ -486,6 +603,7 @@ function stopRecordingAndFinalize(){
     setStatus(tr('statusMainDone'),'ok');
   }
   drawEnergyHistory();
+  hideLowIntensityWarning();
 }
 
 /* ===== Сброс ===== */
@@ -497,13 +615,16 @@ function resetRecording(){
   maxIntensity = 0;
   lastIntegralValue = 0;
   stableCount = 0;
+  currentThreshold = 0;
   if(rafId) {
     cancelAnimationFrame(rafId);
     rafId = null;
   }
   updateSignalInfo();
+  setThresholdInfo(tr('thresholdInfo'));
   ctx.clearRect(0,0,canvas.width,canvas.height);
   setStatus(tr('statusReset'),'ok');
+  hideLowIntensityWarning();
 }
 
 /* ===== Инициализация ===== */
