@@ -161,8 +161,8 @@ function applyTranslations(lang){
   const b7=findOrBindButton('btnResetLast',[translations.ru.resetLast,translations.en.resetLast,translations.he.resetLast]); if(b7) b7.textContent=t.resetLast;
   const h1=document.querySelector('#historySection h3'); if(h1) h1.textContent=t.historyTitle;
   const hh=document.querySelector('#historySection .hint'); if(hh) hh.textContent=t.historyHint;
-  const si=document.getElementById('signalInfo'); if(si && !si.textContent.includes(':')) si.textContent=t.signalInfo;
-  const ti=document.getElementById('thresholdInfo'); if(ti && !ti.textContent.includes(':')) ti.textContent=t.thresholdInfo;
+  const si=document.getElementById('signalInfo'); if (si) si.textContent = t.signalInfo;
+  const ti=document.getElementById('thresholdInfo'); if (ti) ti.textContent = t.thresholdInfo;
   // Update flashing low-intensity overlay text to current language
   try{
     const lw=document.getElementById('lowIntensityWarning');
