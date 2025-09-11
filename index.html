@@ -418,6 +418,35 @@ function drawEnergyHistory(){
   const hasExtras = isMain && data.some(d => d && (d.series || typeof d.cut==='number'));
 
   const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
+
+  // === ФОНОВАЯ ЗАЛИВКА ЗОН ДЛЯ САМОНОРМИРОВАНИЯ (0–0.5 красный, 0.5–0.8 жёлтый, 0.8–1.0 зелёный) ===
+  // Рисуем ПОД сеткой/осями и только в основном режиме при пустой истории нормирования
+  try {
+    if (isMain && !getNormalizationReference()) {
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const yFromVal = (val) => {
+        const y = topPad + H - (H * (val / (maxV || 1)));
+        return clamp(y, topPad, topPad + H);
+      };
+      const y0   = yFromVal(0);
+      const y05  = yFromVal(0.5);
+      const y08  = yFromVal(0.8);
+      const y10  = yFromVal(1.0);
+
+      // Красная зона: 0..0.5
+      hctx.fillStyle = 'rgba(255, 0, 0, 0.08)';
+      hctx.fillRect(leftPad, Math.min(y0, y05), W, Math.abs(y05 - y0));
+
+      // Жёлтая зона: 0.5..0.8
+      hctx.fillStyle = 'rgba(255, 215, 0, 0.10)';
+      hctx.fillRect(leftPad, Math.min(y05, y08), W, Math.abs(y08 - y05));
+
+      // Зелёная зона: 0.8..1.0
+      hctx.fillStyle = 'rgba(0, 128, 0, 0.10)';
+      hctx.fillRect(leftPad, Math.min(y08, y10), W, Math.abs(y10 - y08));
+    }
+  } catch(e) { /* no-op */ }
+
   hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
   for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
   hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
