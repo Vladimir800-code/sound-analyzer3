@@ -187,6 +187,11 @@ function initI18n(){
 
 /* ===== Глобальные переменные / режимы ===== */
 let audioCtx=null, micStream=null, analyser=null, source=null, rafId=null;
+// Добавлено: массив временных меток, отсечка +1с и проценты в точке отсечения
+let sampleTimes=[];
+let cutTimeAbs=null;          // абсолютное время (сек) относительно t0: (signalStartTime + 1)
+let cutPointPercent=null;     // значение нормированной интегральной энергии в точке отсечения, % (0..100)
+
 let recording=false, t0=0, lastT=0;
 let signalStartTime = null;
 let signalEndTime = null;
@@ -261,6 +266,30 @@ function checkAutoStop(currentTime) {
   }
   
   // Проверка автостопа после конца сигнала
+
+  // Вертикаль отсечения в момент (Начало + 1 сек) при самонормировании по единице
+  try {
+    const mode = getMode();
+    const refNow = getNormalizationReference();
+    if (mode==='main' && !refNow && cutTimeAbs!==null) {
+      const totalTime = lastT - t0;
+      if (totalTime > 0) {
+        const xCut = (cutTimeAbs / totalTime) * canvas.width;
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(xCut, 0);
+        ctx.lineTo(xCut, canvas.height);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText('+1с', xCut + 5, 45);
+      }
+    }
+  } catch(e) {}
+
   if (signalEndTime !== null) {
     const timeSinceEnd = elapsedTime - signalEndTime;
     if (timeSinceEnd >= AUTO_STOP_AFTER_END) {
@@ -350,6 +379,14 @@ function updateSignalInfo() {
     signalInfoEl.textContent = tr('signalInfo');
   }
   
+  // Добавляем «Точка отсечения» в запись при самонормировании
+  try {
+    const mode = getMode();
+    if (mode==='main' && !getNormalizationReference() && cutPointPercent!=null) {
+      signalInfoEl.textContent += `, Точка отсечения: ${cutPointPercent.toFixed(1)}%`;
+    }
+  } catch(e) {}
+
   // Добавляем предупреждение о низкой интенсивности в информацию о сигнале
   if (maxIntensity > 0 && maxIntensity < ABSOLUTE_FLOOR * 2) {
     signalInfoEl.textContent += " ⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ!";
@@ -362,6 +399,11 @@ function saveEnergyHistory(a){try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.s
 function addEnergyHistoryEntry(e){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h);}
 function loadEnergyHistoryMain(){try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[]}catch{return[]}}
 function saveEnergyHistoryMain(a){try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a))}catch{}}
+function _downsampleSeries(arr, maxPts){
+  const N = arr.length; if(N<=maxPts) return arr.slice();
+  const out=[]; for(let i=0;i<maxPts;i++){ const idx=Math.round(i*(N-1)/(maxPts-1)); out.push(arr[idx]); }
+  return out;
+}
 function addEnergyHistoryEntryMain(n){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h);}
 function getNormalizationReference(){const h=loadEnergyHistory(); if(!h.length)return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
 
@@ -372,12 +414,28 @@ function drawEnergyHistory(){
   hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
   if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?tr('statusHistEmptyMain'):tr('statusHistEmptyNorm'),20,30);return;}
   const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
+  // Соберем дополнительные слои: полилинии и точки отсечения (для MAIN с самонормированием)
+  const hasExtras = isMain && data.some(d => d && (d.series || typeof d.cut==='number'));
+
   const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
   hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
   for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
   hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
   hctx.fillStyle='#000';hctx.font='12px Arial';hctx.fillText(tr('histX'),leftPad+W/2-60,topPad+H+22);hctx.save();hctx.rotate(-Math.PI/2);hctx.fillText(isMain?tr('histYNorm'):tr('histYAbs'),-topPad-H/2-80,15);hctx.restore();
   hctx.beginPath(); const N=data.length; for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); if(i===0)hctx.moveTo(x,y); else hctx.lineTo(x,y);} hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
+  // Отображаем только точки отсечения; полилинии истории не рисуем
+  if (isMain) {
+    for (let i=0;i<N;i++){
+      const rec = data[i]||{};
+      if (typeof rec.cut==='number'){
+        const x = leftPad + (W*(i/Math.max(1,N-1)));
+        const y = topPad + H - (H*((rec.cut/100)/maxV));
+        hctx.beginPath(); hctx.arc(x, y, 4, 0, Math.PI*2);
+        hctx.fillStyle = '#ff0066';
+        hctx.fill();
+      }
+    }
+  }
   hctx.fillStyle='#111';hctx.font='10px Arial';const step=Math.ceil(N/8); for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
 }
 
@@ -480,6 +538,30 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
     }
   }
   
+
+  // Вертикаль отсечения в момент (Начало + 1 сек) при самонормировании по единице
+  try {
+    const mode = getMode();
+    const refNow = getNormalizationReference();
+    if (mode==='main' && !refNow && cutTimeAbs!==null) {
+      const totalTime = lastT - t0;
+      if (totalTime > 0) {
+        const xCut = (cutTimeAbs / totalTime) * canvas.width;
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.moveTo(xCut, 0);
+        ctx.lineTo(xCut, canvas.height);
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#333';
+        ctx.font = 'bold 12px Arial';
+        ctx.fillText('+1с', xCut + 5, 45);
+      }
+    }
+  } catch(e) {}
+
   if (signalEndTime !== null) {
     const totalTime = lastT - t0;
     if (totalTime > 0) {
@@ -540,6 +622,9 @@ function tick(){
   const buffer=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(buffer);
   const r=rms(buffer), intensity=r*r;
   const t=audioCtx.currentTime, dt=Math.max(0,t-lastT); lastT=t;
+  const relTime = t - t0;
+  sampleTimes.push(relTime);
+
   const last=(integralValues.length?integralValues[integralValues.length-1]:0);
   const next=last+intensity*dt;
   intensityValues.push(intensity); integralValues.push(next);
@@ -552,6 +637,10 @@ function tick(){
   // Определяем начало и конец сигнала
   const signalEvent = detectSignal(intensity, next, t);
   if (signalEvent === 'start') {
+    // Устанавливаем момент отсечения: Начало + 1 сек
+    cutTimeAbs = signalStartTime + 1.0;
+    cutPointPercent = null; // пока неизвестно
+
     setStatus('🔊 Обнаружено начало сигнала', 'ok');
   } else if (signalEvent === 'end') {
     setStatus('🔇 Обнаружен конец сигнала', 'ok');
@@ -571,6 +660,16 @@ function tick(){
       // fallback: самонормирование текущей кривой (асимптота → 1)
       const lastNow = integralValues.length ? integralValues[integralValues.length-1] : 1;
       const norm=integralValues.map(v=>v/(lastNow||1));
+
+      // Вычисляем точку отсечения и процент, если возможно
+      if (cutTimeAbs !== null && sampleTimes.length>0) {
+        // ищем индекс
+        let idx = sampleTimes.findIndex(tt => tt >= cutTimeAbs);
+        if (idx === -1) idx = sampleTimes.length - 1; // если не накопили 1с после начала
+        const val = norm[Math.max(0, idx)] || 0;
+        cutPointPercent = Math.max(0, Math.min(100, val*100));
+      }
+
       drawGraph(intensityValues, norm, true);
     }
   }
@@ -599,7 +698,27 @@ function stopRecordingAndFinalize(){
     const ref=getNormalizationReference();
     const last=integralValues.length?integralValues[integralValues.length-1]:0;
     const norm=ref ? (last/ref) : 1;
-    addEnergyHistoryEntryMain(norm);
+
+    if (!ref) {
+      // самонормирование: сохраняем также точку отсечения и полилинию
+      const lastNow = last||1;
+      const normSeries = integralValues.map(v=>v/(lastNow||1));
+      const ds = _downsampleSeries(normSeries, 200);
+      let cutPct = null;
+      if (cutTimeAbs !== null && sampleTimes.length>0) {
+        let idx = sampleTimes.findIndex(tt => tt >= cutTimeAbs);
+        if (idx === -1) idx = sampleTimes.length-1;
+        const val = normSeries[Math.max(0, idx)] || 0;
+        cutPct = Math.max(0, Math.min(100, val*100));
+      }
+      const d = new Date(); d.setSeconds(0,0);
+      const h = loadEnergyHistoryMain();
+      h.push({ts:d.toISOString(), norm:Number(norm)||0, cut:cutPct, series:ds});
+      saveEnergyHistoryMain(h);
+    } else {
+      addEnergyHistoryEntryMain(norm);
+    }
+
     setStatus(tr('statusMainDone'),'ok');
   }
   drawEnergyHistory();
@@ -608,7 +727,7 @@ function stopRecordingAndFinalize(){
 
 /* ===== Сброс ===== */
 function resetRecording(){
-  recording=false; t0=0; lastT=0; intensityValues=[]; integralValues=[];
+  recording=false; t0=0; lastT=0; intensityValues=[]; integralValues=[]; sampleTimes=[]; cutTimeAbs=null; cutPointPercent=null;
   signalStartTime = null;
   signalEndTime = null;
   isSignalActive = false;
