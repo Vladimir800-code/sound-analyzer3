@@ -425,6 +425,25 @@ function drawEnergyHistory(){
   hctx.beginPath(); const N=data.length; for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); if(i===0)hctx.moveTo(x,y); else hctx.lineTo(x,y);} hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
   // Отображаем только точки отсечения; полилинии истории не рисуем
   if (isMain) {
+    // Сначала рисуем красную ломаную линию для точек отсечения
+    hctx.beginPath();
+    for (let i=0;i<N;i++){
+      const rec = data[i]||{};
+      if (typeof rec.cut==='number'){
+        const x = leftPad + (W*(i/Math.max(1,N-1)));
+        const y = topPad + H - (H*((rec.cut/100)/maxV));
+        if (i === 0) {
+          hctx.moveTo(x, y);
+        } else {
+          hctx.lineTo(x, y);
+        }
+      }
+    }
+    hctx.strokeStyle = '#ff0066';
+    hctx.lineWidth = 1.5;
+    hctx.stroke();
+
+    // Затем рисуем сами точки отсечения
     for (let i=0;i<N;i++){
       const rec = data[i]||{};
       if (typeof rec.cut==='number'){
