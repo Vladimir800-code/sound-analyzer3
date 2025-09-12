@@ -1,76 +1,46 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<title>Acoustic Analysis — Normalization / Main</title>
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acoustic Analyzer — index (with Share)</title>
+<!-- build: AA build index_with_share_2025-09-12_r1 -->
+<script>console.log("AA build index_with_share_2025-09-12_r1");</script>
 <style>
   :root{
-    --grid:#e9e9e9;
-    --axes:#222;
-    --text:#111;
-    --blue:#2f6fed;
-    --green:#1aab55;
-    --green-dark:#0f6e35;
-    --warn:#b15d00;
-    --ok:#0a7a2e;
-    --error:#b00020;
-    --signal-start:#ff6b00;
-    --signal-end:#ff0066;
+    --grid:#e9e9e9; --axes:#222; --text:#111;
+    --blue:#2f6fed; --green:#1aab55;
+    --warn:#b15d00; --ok:#0a7a2e; --error:#b00020;
   }
-  body{font-family:Arial, sans-serif; margin:0; background:#fff; color:#111;}
+  body{font-family:Arial, sans-serif; margin:0; color:var(--text); background:#fff;}
   header{position:relative; padding:10px 12px; border-bottom:1px solid #ddd; background:#fafafa}
   h1{font-size:18px; margin:4px 0;}
+  #langBox{position:absolute; right:12px; top:10px;}
+  #langSelect{padding:6px 10px; border-radius:6px; border:1px solid #ccc;}
   main{padding:8px 0 18px;}
-  .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin:8px 12px;}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin:8px 12px; align-items:center;}
   .button{padding:8px 14px; border-radius:8px; border:1px solid #ccc; cursor:pointer; background:#f5f5f5}
   .button.primary{background:#2f6fed; border-color:#2f6fed; color:#fff}
   .button.alt{background:#fbe9e7; border-color:#f5ccbd; color:#5d2a00}
-  .button:disabled{opacity:0.5; cursor:not-allowed}
   #modeBadge{margin-left:auto; font-size:12px; padding:4px 8px; border-radius:999px; background:#eef; color:#223;}
   body[data-mode="normalization"] #modeBadge{background:#fff6d6; color:#6b4e00;}
   body[data-mode="main"] #modeBadge{background:#e6ffe7; color:#0a5c10;}
-  .card{border:1px solid #ddd; border-radius:10px; padding:10px 12px; background:#fff; margin:8px 12px;}
   .status{margin:8px 12px; font-size:14px;}
   .status.ok{color:var(--ok)} .status.warn{color:var(--warn)} .status.error{color:var(--error)}
-  canvas{border:1px solid #ddd; border-radius:6px; margin:8px 12px;}
+  .card{border:1px solid #ddd; border-radius:10px; padding:10px 12px; background:#fff; margin:8px 12px;}
   .hint{font-size:12px; color:#555; margin:0 12px 12px;}
-  #langBox{position:absolute; right:12px; top:10px;}
-  #langSelect{padding:6px 10px; border-radius:6px; border:1px solid #ccc;}
+  canvas{border:1px solid #ddd; border-radius:6px; margin:8px 12px;}
   .signal-info{margin:8px 12px; padding:8px; background:#f9f9f9; border-radius:6px; font-family:monospace; font-size:13px;}
-  .threshold-info{margin:4px 0; padding:6px; background:#f0f8ff; border-radius:4px; font-family:monospace; font-size:12px; color:#0066cc;}
-  
-  .low-intensity-warning {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: linear-gradient(45deg, #ff0000, #ff8800);
-    color: white;
-    padding: 20px 30px;
-    border-radius: 15px;
-    font-size: 24px;
-    font-weight: bold;
-    text-align: center;
-    z-index: 1000;
-    box-shadow: 0 0 30px rgba(255, 0, 0, 0.7);
-    animation: blinkWarning 0.5s infinite alternate;
-    border: 3px solid #fff;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  }
-  @keyframes blinkWarning {
-    0% { opacity: 1; transform: translate(-50%, -50%) scale(1.05); box-shadow: 0 0 40px rgba(255, 0, 0, 0.9); }
-    100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px rgba(255, 0, 0, 0.5); }
-  }
-  .warning-icon { font-size: 32px; margin-bottom: 10px; display: block; }
-
-  /* Modal (Technical settings) */
+  .small{font-size:12px; color:#666; margin: 0 12px;}
   .modal-backdrop{ position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: none; z-index: 1200; }
-  .modal-card{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 12px; border: 1px solid #ddd; width: min(560px, 92vw); box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
+  .modal-card{ position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+               background: #fff; border-radius: 12px; border: 1px solid #ddd; width: min(560px, 92vw);
+               box-shadow: 0 12px 40px rgba(0,0,0,0.25); }
   .modal-header{ padding: 12px 16px; border-bottom: 1px solid #eee; display:flex; align-items:center; gap:8px; }
   .modal-title{ font-weight: 700; font-size:16px; }
   .modal-body{ padding: 14px 16px 18px; }
   .modal-actions{ padding: 10px 16px; border-top: 1px solid #eee; display:flex; justify-content:flex-end; gap:8px; }
+  .threshold-info{margin:4px 0; padding:6px; background:#f0f8ff; border-radius:4px; font-family:monospace; font-size:12px; color:#0066cc;}
 </style>
 </head>
 <body>
@@ -98,16 +68,18 @@
     <button id="btnStop" class="button">Остановить</button>
     <button id="btnReset" class="button">Сброс</button>
     <button id="btnTech" class="button">Технические настройки</button>
+    <button id="btnShare" class="button">Поделиться</button>
   </div>
 
   <div class="status" id="status">Готов.</div>
+  <div class="small" id="axisNote">Оси: авто‑масштаб с автообрезкой по 95‑му перцентилю</div>
   <canvas id="mainGraph" width="980" height="340"></canvas>
-  <div class="signal-info" id="signalInfo"></div>
+  <div class="signal-info" id="signalInfo">Начало: — с, Конец: — с, Длительность: — с</div>
 
   <section id="historySection" class="card">
     <h3 style="margin:0 0 6px 0;">История результатов текущего режима</h3>
     <canvas id="historyGraph" width="980" height="240"></canvas>
-    <div class="hint">В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть &gt;1 или &lt;1).</div>
+    <div class="hint">Нормирование — абсолютные асимптоты энергии; Основной — нормированные. Ось X: время (локальное).</div>
     <div class="toolbar" style="justify-content:flex-end; margin-top:4px;">
       <button id="btnResetLast" class="button">Сбросить последнее</button>
     </div>
@@ -128,7 +100,6 @@
           <input id="thrSlider" type="range" min="0" max="10" step="0.5" value="5" style="flex:1;">
           <span id="thrValue" style="min-width:56px; text-align:right;">5.0%</span>
         </div>
-        <div style="font-size:12px; color:#666; margin-top:6px;">Applies instantly and is saved locally.</div>
       </div>
       <div style="margin-top:14px; font-size:14px;">
         <label for="stabSlider" style="display:block; margin-bottom:6px; font-weight:600;">Stability criterion, %</label>
@@ -136,10 +107,6 @@
           <input id="stabSlider" type="range" min="0" max="5" step="0.25" value="1" style="flex:1;">
           <span id="stabValue" style="min-width:56px; text-align:right;">1.00%</span>
         </div>
-        <div style="font-size:12px; color:#666; margin-top:6px;">Lower = более чувствительно к завершению, Higher = более строгое завершение.</div>
-      </div>
-      <div style="font-size:12px;color:#666;margin-top:8px;">
-        * Threshold is computed as the maximum of the chosen percent of the current max intensity and an absolute floor.
       </div>
     </div>
     <div class="modal-actions">
@@ -148,657 +115,307 @@
   </div>
 </div>
 
-<div id="lowIntensityWarning" class="low-intensity-warning" style="display: none;">
-  <span class="warning-icon">⚠️</span>
-  НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!<br>
-  Увеличьте громкость!
-</div>
-
 <script>
-/* I18N (RU/EN/HE) */
+"use strict";
+/* I18N */
 const LANG_KEY='ui_lang_v1';
 function currLang(){ return localStorage.getItem(LANG_KEY)||'ru'; }
 const translations={
-  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",startLabel:"Начало",endLabel:"Конец",durationLabel:"Длительность",cutLabel:"Точка отсечения",secUnit:"с"},
-  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s",startLabel:"Start",endLabel:"End",durationLabel:"Duration",cutLabel:"Cutoff point",secUnit:"s"},
-  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופפון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",startLabel:"התחלה",endLabel:"סוף",durationLabel:"משך",cutLabel:"נקודת חיתוך",secUnit:"ש"}
+  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"Нормирование — абсолютные асимптоты энергии; Основной — нормированные. Ось X: время (локальное).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (отн.)",histYNorm:"Нормированная асимптота",histYAbs:"Интегральная энергия",histX:"Время",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись…",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainDone:"✅ Анализ завершён.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",startLabel:"Начало",endLabel:"Конец",durationLabel:"Длительность",cutLabel:"Точка отсечения",secUnit:"с"},
+  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"Normalization — absolute energy; Main — normalized. X axis: local time.",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (rel.)",histYNorm:"Normalized asymptote",histYAbs:"Integral energy",histX:"Time",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainDone:"✅ Analysis finished.",signalInfo:"Start: — s, End: — s, Duration: — s",startLabel:"Start",endLabel:"End",durationLabel:"Duration",cutLabel:"Cutoff point",secUnit:"s"},
+  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"נרמול — אנרגיה מוחלטת; עיקרי — מנורמלת. ציר X: זמן מקומי.",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה",yRightNorm:"אנרגיה מנורמלת",yRightRaw:"אנרגיה",histYNorm:"אסימפטוטה מנורמלת",histYAbs:"אנרגיה אינטגרלית",histX:"זמן",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusNormOn:"🟡 מצב נרמול.",statusMainDone:"✅ הניתוח הושלם.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",startLabel:"התחלה",endLabel:"סוף",durationLabel:"משך",cutLabel:"נקודת חיתוך",secUnit:"ש"}
 };
-function tr(key){ try{ return (translations[currLang()]||translations.ru)[key] || key; }catch(e){ return key; } }
+function tr(key){ const lang=(localStorage.getItem(LANG_KEY)||'ru'); const pack=translations[lang]||translations.ru; return pack[key]??key; }
 function setStatus(msg, level='ok'){ const el=document.getElementById('status'); el.className='status '+(level||'ok'); el.textContent=msg; }
-function setThresholdInfo(msg){ const el=document.getElementById('thresholdInfo'); if(el) el.textContent=msg; }
-function textMatches(el,vars){const t=(el.textContent||'').trim();return vars.some(v=>v===t);}
-function findOrBindButton(id,keys){let el=document.getElementById(id);if(el)return el;const btns=Array.from(document.querySelectorAll('button'));for(const b of btns){if(textMatches(b,keys)){b.id=id;return b;}}return null;}
-function applyTranslations(lang){
-  const t=translations[lang]||translations.ru;
-  const title=document.getElementById('titleText'); if(title) title.textContent=t.title;
-  const b1=findOrBindButton('btnStartNorm',[translations.ru.startNorm,translations.en.startNorm,translations.he.startNorm]); if(b1) b1.textContent=t.startNorm;
-  const b2=findOrBindButton('btnFinishNorm',[translations.ru.finishNorm,translations.en.finishNorm,translations.he.finishNorm]); if(b2) b2.textContent=t.finishNorm;
-  const b3=findOrBindButton('btnRequestMic',[translations.ru.requestMic,translations.en.requestMic,translations.he.requestMic]); if(b3) b3.textContent=t.requestMic;
-  const b4=findOrBindButton('btnStart',[translations.ru.startRec,translations.en.startRec,translations.he.startRec]); if(b4) b4.textContent=t.startRec;
-  const b5=findOrBindButton('btnStop',[translations.ru.stopRec,translations.en.stopRec,translations.he.stopRec]); if(b5) b5.textContent=t.stopRec;
-  const b6=findOrBindButton('btnReset',[translations.ru.reset,translations.en.reset,translations.he.reset]); if(b6) b6.textContent=t.reset;
-  const b7=findOrBindButton('btnResetLast',[translations.ru.resetLast,translations.en.resetLast,translations.he.resetLast]); if(b7) b7.textContent=t.resetLast;
-  const h1=document.querySelector('#historySection h3'); if(h1) h1.textContent=t.historyTitle;
-  const hh=document.querySelector('#historySection .hint'); if(hh) hh.textContent=t.historyHint;
-  const bTech=findOrBindButton('btnTech',[translations.ru.techSettings||"Технические настройки","Technical settings",translations.he.techSettings||"הגדרות טכניות"]); if(bTech) bTech.textContent=(lang==='ru'?"Технические настройки":lang==='he'?"הגדרות טכניות":"Technical settings");
-  document.body.dir=(lang==='he')?'rtl':'ltr';
-  localStorage.setItem(LANG_KEY,lang);
-  try{ updateSignalInfo(); }catch(e){}
-  try { modeBadge.textContent = (getMode()==='normalization') ? tr('modeBadgeNorm') : tr('modeBadgeMain'); } catch(e){}
-  try { drawEnergyHistory(); } catch(e){}
-  try{ setStatus(t.ready,'ok'); }catch(e){}
+
+/* Helpers */
+function niceNum(range, round){
+  const exp = Math.floor(Math.log10(range||1));
+  const f = (range / Math.pow(10, exp)) || 1;
+  let nf;
+  if (round){
+    if (f < 1.5) nf = 1;
+    else if (f < 3) nf = 2;
+    else if (f < 7) nf = 5;
+    else nf = 10;
+  }else{
+    if (f <= 1) nf = 1;
+    else if (f <= 2) nf = 2;
+    else if (f <= 5) nf = 5;
+    else nf = 10;
+  }
+  return nf * Math.pow(10, exp);
+}
+function niceAxis(minV, maxV, maxTicks=6){
+  if (!isFinite(minV) || !isFinite(maxV)) { minV=0; maxV=1; }
+  if (minV === maxV) { maxV = minV + 1; }
+  const range = niceNum(maxV - minV, false);
+  const step  = niceNum(range / (maxTicks - 1), true);
+  const graphMin = Math.floor(minV / step) * step;
+  const graphMax = Math.ceil (maxV / step) * step;
+  const ticks = [];
+  for (let v=graphMin; v<=graphMax + 0.5*step; v+=step){ ticks.push(v); }
+  return {min:graphMin, max:graphMax, step, ticks};
+}
+function percentile(arr, p){
+  const a = arr.slice().filter(v=>isFinite(v)).sort((x,y)=>x-y);
+  if (!a.length) return 0;
+  const idx = (p/100)*(a.length-1);
+  const lo = Math.floor(idx), hi = Math.ceil(idx);
+  if (lo===hi) return a[lo];
+  const w = idx - lo;
+  return a[lo]*(1-w) + a[hi]*w;
+}
+function fmtVal(v){
+  const av = Math.abs(v);
+  if (av>0 && (av<1e-3 || av>=1e5)) return v.toExponential(2);
+  const s = v.toFixed( (av<1?3:(av<10?2:(av<100?1:0))) );
+  return s.replace('.', ',');
 }
 
-/* Modes & elements */
-let audioCtx=null, micStream=null, analyser=null, source=null, rafId=null;
-let sampleTimes=[];
-let cutTimeAbs=null, cutPointPercent=null;
+/* State */
+let audioCtx=null, analyser=null, micStream=null, source=null;
+let rafId=null, recording=false, t0=0, lastT=0;
+let intensityValues=[], integralValues=[], sampleTimes=[];
+let signalStartTime=null, signalEndTime=null, isSignalActive=false;
+let lastIntegralValue=0, stableCount=0, maxIntensity=0, currentThreshold=0;
 
-let recording=false, t0=0, lastT=0;
-let signalStartTime = null;
-let signalEndTime = null;
-let isSignalActive = false;
-let maxIntensity = 0;
-let lastIntegralValue = 0;
-let stableCount = 0;
-let currentThreshold = 0;
-let lowIntensityWarningActive = false;
-let warningTimeout = null;
 const MODE_KEY='analysisModeV1';
 const ENERGY_HISTORY_KEY='energyHistoryV1';
 const ENERGY_HISTORY_MAIN_KEY='energyHistoryMainV1';
-const modeBadge=document.getElementById('modeBadge');
-const canvas=document.getElementById('mainGraph'), ctx=canvas.getContext('2d');
-const historyCanvas=document.getElementById('historyGraph'), hctx=historyCanvas.getContext('2d');
-const btnRequestMic=document.getElementById('btnRequestMic');
-const btnStart=document.getElementById('btnStart');
-const btnStop=document.getElementById('btnStop');
-const btnReset=document.getElementById('btnReset');
-const btnStartNorm=document.getElementById('btnStartNorm');
-const btnFinishNorm=document.getElementById('btnFinishNorm');
-const btnResetLast=document.getElementById('btnResetLast');
-const btnTech=document.getElementById('btnTech');
-const btnCloseTech=document.getElementById('btnCloseTech');
-const techModal=document.getElementById('techModal');
-const signalInfoEl = document.getElementById('signalInfo');
-const lowIntensityWarning = document.getElementById('lowIntensityWarning');
 
-/* Threshold slider persistence */
+/* Settings */
 const THRESHOLD_PCT_KEY = 'thr_pct_v1';
-function getThresholdPct(){
-  let v = parseFloat(localStorage.getItem(THRESHOLD_PCT_KEY));
-  if (!(v>=0 && v<=10)) v = 5;
-  return v;
-}
-function setThresholdPct(v){
-  v = Math.max(0, Math.min(10, Number(v)||0));
-  localStorage.setItem(THRESHOLD_PCT_KEY, String(v));
-}
-function getRelativeThresholdFraction(){
-  return getThresholdPct() / 100;
-}
-
-/* Stability slider persistence */
 const STABILITY_PCT_KEY = 'stability_pct_v1';
-function getStabilityPct(){
-  let v = parseFloat(localStorage.getItem(STABILITY_PCT_KEY));
-  if (!(v>=0 && v<=5)) v = 1;
-  return v;
-}
-function setStabilityPct(v){
-  v = Math.max(0, Math.min(5, Number(v)||0));
-  localStorage.setItem(STABILITY_PCT_KEY, String(v));
-}
-function getStabilityCriterion(){
-  return getStabilityPct() / 100;
+function getThresholdPct(){ let v=parseFloat(localStorage.getItem(THRESHOLD_PCT_KEY)); return (v>=0&&v<=10)?v:5; }
+function setThresholdPct(v){ v=Math.max(0,Math.min(10,Number(v)||0)); localStorage.setItem(THRESHOLD_PCT_KEY,String(v)); }
+function getRelativeThresholdFraction(){ return getThresholdPct()/100; }
+function getStabilityPct(){ let v=parseFloat(localStorage.getItem(STABILITY_PCT_KEY)); return (v>=0&&v<=5)?v:1; }
+function setStabilityPct(v){ v=Math.max(0,Math.min(5,Number(v)||0)); localStorage.setItem(STABILITY_PCT_KEY,String(v)); }
+function getStabilityCriterion(){ return getStabilityPct()/100; }
+const ABSOLUTE_FLOOR=0.001, STABLE_SAMPLES_REQUIRED=10, AUTO_STOP_AFTER_END=3.0, MAX_RECORDING_TIME=30.0;
+
+function getMode(){ const v=localStorage.getItem(MODE_KEY); return (v==='main'||v==='normalization')?v:'normalization'; }
+function setMode(v){ localStorage.setItem(MODE_KEY,v); applyMode(); }
+function applyMode(){
+  const mode=getMode();
+  document.body.setAttribute('data-mode',mode);
+  document.getElementById('modeBadge').textContent=(mode==='normalization')?tr('modeBadgeNorm'):tr('modeBadgeMain');
+  drawEnergyHistory();
 }
 
-const ABSOLUTE_FLOOR = 0.001;
-// const INTEGRAL_STABILITY_THRESHOLD = 0.01; // replaced by getStabilityCriterion()
-const STABLE_SAMPLES_REQUIRED = 10;
-const AUTO_STOP_AFTER_END = 3.0;
-const MAX_RECORDING_TIME = 30.0;
-
-function getMode(){const v=localStorage.getItem(MODE_KEY); return (v==='main'||v==='normalization')?v:'normalization';}
-function setMode(v){localStorage.setItem(MODE_KEY,v); applyMode();}
-function applyMode(){const mode=getMode(); modeBadge.textContent=(mode==='normalization')?tr('modeBadgeNorm'):tr('modeBadgeMain'); document.body.setAttribute('data-mode',mode); drawEnergyHistory();}
-
-/* Warnings */
-function showLowIntensityWarning() {
-  if (!lowIntensityWarningActive) {
-    lowIntensityWarningActive = true;
-    lowIntensityWarning.style.display = 'block';
-    if (warningTimeout) clearTimeout(warningTimeout);
-    warningTimeout = setTimeout(() => { hideLowIntensityWarning(); }, 5000);
-  }
-}
-function hideLowIntensityWarning() {
-  lowIntensityWarningActive = false;
-  lowIntensityWarning.style.display = 'none';
-  if (warningTimeout) { clearTimeout(warningTimeout); warningTimeout = null; }
-}
-
-/* Modal helpers */
-function openTech(){ 
-  techModal.style.display='block'; 
-  try{
-    const rel = Math.max(maxIntensity * getRelativeThresholdFraction(), ABSOLUTE_FLOOR);
-    setThresholdInfo(`Current threshold: ${rel.toExponential(2)} (${getThresholdPct().toFixed(1)}% of max ${maxIntensity>0?maxIntensity.toExponential(2):'—'})`);
-    const slider = document.getElementById('thrSlider');
-    const out = document.getElementById('thrValue');
-    if (slider && out){
-      const pct = getThresholdPct();
-      slider.value = String(pct);
-      out.textContent = pct.toFixed(1) + '%';
-    }
-    const s2 = document.getElementById('stabSlider');
-    const o2 = document.getElementById('stabValue');
-    if (s2 && o2){
-      const pct2 = getStabilityPct();
-      s2.value = String(pct2);
-      o2.textContent = pct2.toFixed(2) + '%';
-    }
-  }catch(e){}
-}
-function closeTech(){ techModal.style.display='none'; }
-
-/* AutoStop & decorations */
-function checkAutoStop(currentTime) {
-  const elapsedTime = currentTime - t0;
-  if (elapsedTime >= MAX_RECORDING_TIME) {
-    setStatus('⏱️ Максимальное время записи (30 сек) достигнуто', 'warn');
-    stopRecordingAndFinalize();
-    return true;
-  }
-  try {
-    const mode = getMode();
-    const refNow = getNormalizationReference();
-    if (mode==='main' && !refNow && cutTimeAbs!==null) {
-      const totalTime = lastT - t0;
-      if (totalTime > 0) {
-        const xCut = (cutTimeAbs / totalTime) * canvas.width;
-        ctx.beginPath();
-        ctx.setLineDash([4, 4]);
-        ctx.moveTo(xCut, 0);
-        ctx.lineTo(xCut, canvas.height);
-        ctx.strokeStyle = '#444';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 12px Arial';
-        ctx.fillText('+1с', xCut + 5, 45);
-      }
-    }
-  } catch(e) {}
-  if (signalEndTime !== null) {
-    const timeSinceEnd = elapsedTime - signalEndTime;
-    if (timeSinceEnd >= AUTO_STOP_AFTER_END) {
-      setStatus('⏱️ Автостоп: прошло 3 сек после конца сигнала', 'ok');
-      stopRecordingAndFinalize();
-      return true;
-    }
-  }
-  return false;
-}
-
-/* Signal detection */
-function detectSignal(intensity, currentIntegral, currentTime) {
-  const timeFromStart = currentTime - t0;
-  maxIntensity = Math.max(maxIntensity, intensity);
-  const relativeThreshold = Math.max(maxIntensity * getRelativeThresholdFraction(), ABSOLUTE_FLOOR);
-  currentThreshold = relativeThreshold;
-  setThresholdInfo(`Current threshold: ${relativeThreshold.toExponential(2)} (${getThresholdPct().toFixed(1)}% of max ${maxIntensity.toExponential(2)})`);
-  if (maxIntensity < ABSOLUTE_FLOOR * 2) {
-    setStatus('⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА! Увеличьте громкость.', 'warn');
-    showLowIntensityWarning();
-  } else {
-    if (document.getElementById('status').textContent.includes('НИЗКАЯ ИНТЕНСИВНОСТЬ')) {
-      setStatus(tr('statusRec'), 'ok');
-    }
-    hideLowIntensityWarning();
-  }
-  if (!isSignalActive && intensity > relativeThreshold) {
-    isSignalActive = true;
-    signalStartTime = timeFromStart;
-    lastIntegralValue = currentIntegral;
-    stableCount = 0;
-    return 'start';
-  }
-  if (isSignalActive && currentIntegral > 0) {
-    const relativeChange = Math.abs((currentIntegral - lastIntegralValue) / currentIntegral);
-    if (relativeChange <= getStabilityCriterion()) {
-      stableCount++;
-      if (stableCount >= STABLE_SAMPLES_REQUIRED && signalEndTime === null) {
-        isSignalActive = false;
-        signalEndTime = timeFromStart - (stableCount * (currentTime - lastT));
-        stableCount = 0;
-        return 'end';
-      }
-    } else {
-      stableCount = 0;
-      lastIntegralValue = currentIntegral;
-    }
-  }
-  if (signalEndTime !== null && intensity > relativeThreshold) {
-    return null;
-  }
-  return null;
-}
-
-function composeSignalInfoText(){
-  const startLbl = tr('startLabel');
-  const endLbl = tr('endLabel');
-  const durLbl = tr('durationLabel');
-  const cutLbl = tr('cutLabel');
-  const sec = tr('secUnit');
-  if (signalStartTime !== null && signalEndTime !== null) {
-    const duration = signalEndTime - signalStartTime;
-    let line = `${startLbl}: ${signalStartTime.toFixed(2)} ${sec}, ${endLbl}: ${signalEndTime.toFixed(2)} ${sec}, ${durLbl}: ${duration.toFixed(2)} ${sec}`;
-    try {
-      const mode = getMode();
-      if (mode==='main' && !getNormalizationReference() && cutPointPercent!=null) {
-        line += `, ${cutLbl}: ${cutPointPercent.toFixed(1)}%`;
-      }
-    } catch(e) {}
-    return line;
-  } else if (signalStartTime !== null) {
-    let line = `${startLbl}: ${signalStartTime.toFixed(2)} ${sec}, ${endLbl}: — ${sec}, ${durLbl}: — ${sec}`;
-    try {
-      const mode = getMode();
-      if (mode==='main' && !getNormalizationReference() && cutPointPercent!=null) {
-        line += `, ${cutLbl}: ${cutPointPercent.toFixed(1)}%`;
-      }
-    } catch(e) {}
-    return line;
-  } else {
-    return tr('signalInfo');
-  }
-}
-function updateSignalInfo() {
-  const si = document.getElementById('signalInfo');
-  if (!si) return;
-  si.textContent = composeSignalInfoText();
-  if (maxIntensity > 0 && maxIntensity < ABSOLUTE_FLOOR * 2) {
-    si.textContent += " ⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ!";
-  }
+/* I18N apply */
+function applyTranslations(lang){
+  localStorage.setItem(LANG_KEY, lang);
+  document.getElementById('titleText').textContent = tr('title');
+  document.getElementById('btnStartNorm').textContent = tr('startNorm');
+  document.getElementById('btnFinishNorm').textContent = tr('finishNorm');
+  document.getElementById('btnRequestMic').textContent = tr('requestMic');
+  document.getElementById('btnStart').textContent = tr('startRec');
+  document.getElementById('btnStop').textContent = tr('stopRec');
+  document.getElementById('btnReset').textContent = tr('reset');
+  document.querySelector('#historySection h3').textContent = tr('historyTitle');
+  document.querySelector('#historySection .hint').textContent = tr('historyHint');
+  document.getElementById('axisNote').textContent = "Оси: авто‑масштаб с автообрезкой по 95‑му перцентилю";
+  applyMode();
+  updateSignalInfo();
+  setStatus(tr('ready'),'ok');
 }
 
 /* History */
 function loadEnergyHistory(){ try{const r=localStorage.getItem(ENERGY_HISTORY_KEY); return r?JSON.parse(r):[];}catch(e){return [];} }
 function saveEnergyHistory(a){ try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.stringify(a));}catch(e){} }
-function addEnergyHistoryEntry(e){ const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h); }
+function addEnergyHistoryEntry(e){ const d=new Date(); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h); }
 function loadEnergyHistoryMain(){ try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[];}catch(e){return [];} }
 function saveEnergyHistoryMain(a){ try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a));}catch(e){} }
-function _downsampleSeries(arr, maxPts){ const N = arr.length; if(N<=maxPts) return arr.slice(); const out=[]; for(let i=0;i<maxPts;i++){ const idx=Math.round(i*(N-1)/(maxPts-1)); out.push(arr[idx]); } return out; }
-function addEnergyHistoryEntryMain(n){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h);}
-function getNormalizationReference(){const h=loadEnergyHistory(); if(!h.length)return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
+function addEnergyHistoryEntryMain(n){ const d=new Date(); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h); }
+function getNormalizationReference(){ const h=loadEnergyHistory(); if(!h.length) return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null; }
 
+/* Axes with auto‑clip */
+function drawAxes(ctx, W, H, leftPad, bottomPad, yTicks, yMin, yMax, xTicks, xFormatter, yFormatter){
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); ctx.lineWidth=1;
+  yTicks.forEach(v=>{ const y = (H - bottomPad) - ( (v - yMin) / (yMax - yMin || 1) ) * (H - bottomPad - 10); ctx.beginPath(); ctx.moveTo(leftPad, y); ctx.lineTo(W-10, y); ctx.stroke(); });
+  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes'); ctx.beginPath();
+  ctx.moveTo(leftPad, 10); ctx.lineTo(leftPad, H - bottomPad); ctx.lineTo(W - 10, H - bottomPad); ctx.stroke();
+  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text'); ctx.font='11px Arial'; ctx.textAlign='right';
+  yTicks.forEach(v=>{ const y = (H - bottomPad) - ( (v - yMin) / (yMax - yMin || 1) ) * (H - bottomPad - 10); ctx.fillText(yFormatter(v), leftPad - 6, y - 2); });
+  ctx.textAlign='center';
+  xTicks.forEach((tick)=>{
+    const x = leftPad + (tick.pos * (W - leftPad - 10));
+    ctx.beginPath(); ctx.moveTo(x, H - bottomPad); ctx.lineTo(x, H - bottomPad + 4); ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes'); ctx.stroke();
+    ctx.fillText(xFormatter(tick.label), x, H - bottomPad + 16);
+  });
+}
+
+/* Live graph */
+const canvas=document.getElementById('mainGraph'), ctx=canvas.getContext('2d');
+const historyCanvas=document.getElementById('historyGraph'), hctx=historyCanvas.getContext('2d');
+
+function drawGraph(intensityValues, secondSeries, isNorm=false){
+  const W=canvas.width, H=canvas.height, leftPad=60, bottomPad=24;
+  ctx.clearRect(0,0,W,H);
+  const yAll=[...intensityValues,...secondSeries].filter(v=>isFinite(v) && v>=0);
+  const clipMax = percentile(yAll, 95);
+  const yMin=0, yMax=Math.max(clipMax, 1e-6);
+  const yAxis=niceAxis(yMin, yMax, 6);
+  const T = (sampleTimes.length?sampleTimes[sampleTimes.length-1]:0) || 0;
+  const xAxis = niceAxis(0, Math.max(T,1), 6);
+  const xTicks = xAxis.ticks.map(v=>({pos: (v - xAxis.min)/(xAxis.max - xAxis.min || 1), label: v}));
+  drawAxes(ctx, W, H, leftPad, bottomPad, yAxis.ticks, yAxis.min, yAxis.max, xTicks, v=>String(v), fmtVal);
+  function X(i){ const t = sampleTimes[i]||0; return leftPad + ((t - xAxis.min)/(xAxis.max - xAxis.min || 1))*(W - leftPad - 10); }
+  function Y(val){ return (H - bottomPad) - ((val - yAxis.min)/(yAxis.max - yAxis.min || 1))*(H - bottomPad - 10); }
+  ctx.beginPath(); for(let i=0;i<intensityValues.length;i++){ const x=X(i), y=Y(intensityValues[i]||0); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--blue'); ctx.lineWidth=2; ctx.stroke();
+  ctx.beginPath(); for(let i=0;i<secondSeries.length;i++){ const x=X(i), y=Y(secondSeries[i]||0); if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); ctx.lineWidth=2; ctx.stroke();
+}
+
+/* History graph (time on X, auto‑clip) */
 function drawEnergyHistory(){
-  const mode=getMode(), isMain=(mode==='main');
+  const isMain=(getMode()==='main');
   const data=isMain?loadEnergyHistoryMain():loadEnergyHistory();
-  hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
-  if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?tr('statusHistEmptyMain'):tr('statusHistEmptyNorm'),20,30);return;}
-  const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
-  const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
-  try {
-    if (isMain && !getNormalizationReference()) {
-      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-      const yFromVal = (val) => { const y = topPad + H - (H * (val / (maxV || 1))); return clamp(y, topPad, topPad + H); };
-      const y0   = yFromVal(0);
-      const y05  = yFromVal(0.5);
-      const y08  = yFromVal(0.8);
-      const y10  = yFromVal(1.0);
-      hctx.fillStyle = 'rgba(255, 0, 0, 0.08)'; hctx.fillRect(leftPad, Math.min(y0, y05), W, Math.abs(y05 - y0));
-      hctx.fillStyle = 'rgba(255, 215, 0, 0.10)'; hctx.fillRect(leftPad, Math.min(y05, y08), W, Math.abs(y08 - y05));
-      hctx.fillStyle = 'rgba(0, 128, 0, 0.10)'; hctx.fillRect(leftPad, Math.min(y08, y10), W, Math.abs(y10 - y08));
-    }
-  } catch(e) { }
-  hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
-  for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
-  hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
-  hctx.fillStyle='#000';hctx.font='12px Arial';hctx.fillText(tr('histX'),leftPad+W/2-60,topPad+H+22);hctx.save();hctx.rotate(-Math.PI/2);hctx.fillText(isMain?tr('histYNorm'):tr('histYAbs'),-topPad-H/2-80,15);hctx.restore();
-  hctx.beginPath(); const N=data.length; for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); if(i===0)hctx.moveTo(x,y); else hctx.lineTo(x,y);} hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
-  if (isMain) {
-    hctx.beginPath();
-    for (let i=0;i<N;i++){ const rec = data[i]||{}; if (typeof rec.cut==='number'){ const x = leftPad + (W*(i/Math.max(1,N-1))); const y = topPad + H - (H*((rec.cut/100)/maxV)); if (i === 0) hctx.moveTo(x, y); else hctx.lineTo(x, y); } }
-    hctx.strokeStyle = '#ff0066'; hctx.lineWidth = 1.5; hctx.stroke();
-    for (let i=0;i<N;i++){ const rec = data[i]||{}; if (typeof rec.cut==='number'){ const x = leftPad + (W*(i/Math.max(1,N-1))); const y = topPad + H - (H*((rec.cut/100)/maxV)); hctx.beginPath(); hctx.arc(x, y, 4, 0, Math.PI*2); hctx.fillStyle = '#ff0066'; hctx.fill(); } }
+  const W=historyCanvas.width, H=historyCanvas.height, leftPad=60, bottomPad=26;
+  hctx.clearRect(0,0,W,H);
+  if(!data.length){
+    hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?'История основного режима пуста.':'История нормирования пуста.',20,30);
+    return;
   }
-  hctx.fillStyle='#111';hctx.font='10px Arial';const step=Math.ceil(N/8);
-  for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
+  const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)).filter(v=>isFinite(v)&&v>=0);
+  const yMax = Math.max(percentile(vals,95), 1e-6);
+  const yAxis=niceAxis(0, yMax, 6);
+  const ts = data.map(d=>new Date(d.ts).getTime());
+  const tMin=Math.min(...ts), tMax=Math.max(...ts), tRange=Math.max(1, tMax - tMin);
+  const ticksCount = 6, xTicks=[];
+  for(let i=0;i<ticksCount;i++){ const f = (ticksCount===1)?0:(i/(ticksCount-1)); const tt = tMin + f*tRange; xTicks.push({pos:f, label: tt}); }
+  const xFormatter=(tms)=> new Date(tms).toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  drawAxes(hctx, W, H, leftPad, bottomPad, yAxis.ticks, yAxis.min, yAxis.max, xTicks, xFormatter, fmtVal);
+  function X(idx){ const f = (ts[idx]-tMin)/tRange; return leftPad + f*(W - leftPad - 10); }
+  function Y(val){ return (H - bottomPad) - ((val - yAxis.min)/(yAxis.max - yAxis.min || 1))*(H - bottomPad - 10); }
+  hctx.beginPath(); for(let i=0;i<vals.length;i++){ const x=X(i), y=Y(vals[i]); if(i===0) hctx.moveTo(x,y); else hctx.lineTo(x,y); } hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
 }
 
-/* Remove last + auto-repeat */
-function removeLastHistoryEntry(){
-  const mode=getMode();
-  if(mode==='main'){const h=loadEnergyHistoryMain(); if(!h.length){setStatus(tr('statusHistEmptyMain'),'warn');return;} h.pop(); saveEnergyHistoryMain(h); setStatus(tr('statusHistDelMain'),'ok');}
-  else{const h=loadEnergyHistory(); if(!h.length){setStatus(tr('statusHistEmptyNorm'),'warn');return;} h.pop(); saveEnergyHistory(h); setStatus(tr('statusHistDelNorm'),'ok');}
-  drawEnergyHistory();
+/* Info */
+function composeSignalInfoText(){
+  const sec=tr('secUnit'); const startLbl=tr('startLabel'); const endLbl=tr('endLabel'); const durLbl=tr('durationLabel');
+  if (signalStartTime!==null && signalEndTime!==null){
+    const d=signalEndTime-signalStartTime; return `${startLbl}: ${signalStartTime.toFixed(2)} ${sec}, ${endLbl}: ${signalEndTime.toFixed(2)} ${sec}, ${durLbl}: ${d.toFixed(2)} ${sec}`;
+  } else if (signalStartTime!==null){
+    return `${startLbl}: ${signalStartTime.toFixed(2)} ${sec}, ${endLbl}: — ${sec}, ${durLbl}: — ${sec}`;
+  } else return tr('signalInfo');
 }
-if(btnResetLast) btnResetLast.addEventListener('click',removeLastHistoryEntry);
-let _resetHoldTimer=null, _resetRepeatTimer=null; const _initialDelayMs=600, _repeatEveryMs=250;
-function _startResetAutoRepeat(){ if(_resetHoldTimer||_resetRepeatTimer) return; _resetHoldTimer=setTimeout(()=>{ removeLastHistoryEntry(); _resetRepeatTimer=setInterval(removeLastHistoryEntry,_repeatEveryMs); }, _initialDelayMs); }
-function _stopResetAutoRepeat(){ if(_resetHoldTimer){clearTimeout(_resetHoldTimer);_resetHoldTimer=null;} if(_resetRepeatTimer){clearInterval(_resetRepeatTimer);_resetRepeatTimer=null;} }
-if(btnResetLast){ btnResetLast.addEventListener('mousedown',e=>{ if(e.button===0) _startResetAutoRepeat();}); window.addEventListener('mouseup',_stopResetAutoRepeat); btnResetLast.addEventListener('mouseleave',_stopResetAutoRepeat); btnResetLast.addEventListener('touchstart',e=>{e.preventDefault();_startResetAutoRepeat();},{passive:false}); window.addEventListener('touchend',_stopResetAutoRepeat); window.addEventListener('touchcancel',_stopResetAutoRepeat); btnResetLast.addEventListener('contextmenu',e=>e.preventDefault());}
-
-/* Graph */
-function mapValToY(val,minV,maxV){const h=canvas.height,p=(val-minV)/(maxV-minV||1);return(h-1)-p*(h-1);}
-function drawGraph(intensityValues,secondSeries,isNorm=false){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  try{
-    const totalTime = Math.max((typeof lastT!=='undefined' && typeof t0!=='undefined') ? (lastT - t0) : 0, 0);
-    if (totalTime > 0.001){
-      const secs = Math.floor(totalTime);
-      const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#e9e9e9';
-      ctx.strokeStyle = gridColor; ctx.lineWidth = 1; ctx.textAlign = 'center'; ctx.fillStyle = '#555'; ctx.font = '11px Arial';
-      for (let s=0; s<=secs; s++){
-        const x = (s / totalTime) * canvas.width;
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
-        if (s % 5 === 0){ ctx.save(); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); ctx.restore(); }
-        ctx.fillText(String(s), x, canvas.height - 6);
-      }
-      ctx.textAlign = 'left';
-    }
-  }catch(e){}
-  let maxI=Math.max(...intensityValues)||1, maxS=Math.max(...secondSeries)||1;
-  const maxIfs=maxI*1.05, maxSfs=maxS*1.1;
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid');
-  for(let i=0;i<=5;i++){const y=mapValToY(maxIfs*i/5,0,maxIfs);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
-  ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes');ctx.beginPath();ctx.moveTo(0,canvas.height-1);ctx.lineTo(canvas.width,canvas.height-1);ctx.moveTo(0,0);ctx.lineTo(0,canvas.height);ctx.stroke();
-  ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text');ctx.font='12px Arial';ctx.textAlign='left';
-  for(let i=0;i<=5;i++){const v=maxIfs*i/5,y=mapValToY(v,0,maxIfs);ctx.fillText(v.toExponential(2),5,y-3);}
-  ctx.save();ctx.rotate(-Math.PI/2);ctx.fillText(tr('yLeft'),-canvas.height+10,14);ctx.restore();
-  ctx.textAlign='right';
-  for(let i=0;i<=5;i++){const v=maxSfs*i/5,y=mapValToY(v,0,maxSfs);ctx.fillText(isNorm?v.toFixed(2):v.toExponential(2),canvas.width-5,y-3);}
-  ctx.save();ctx.rotate(Math.PI/2);ctx.fillText(isNorm?tr('yRightNorm'):tr('yRightRaw'),canvas.height/2-60,canvas.width-10);ctx.restore();
-  ctx.beginPath(); for(let i=0;i<intensityValues.length;i++){const x=(i/Math.max(intensityValues.length-1,1))*canvas.width;const y=mapValToY(intensityValues[i],0,maxIfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--blue');ctx.lineWidth=2;ctx.stroke();
-  ctx.beginPath(); for(let i=0;i<secondSeries.length;i++){const x=(i/Math.max(secondSeries.length-1,1))*canvas.width;const y=mapValToY(secondSeries[i],0,maxSfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green');ctx.lineWidth=2;ctx.stroke();
-  if (secondSeries.length>1){
-    const last = secondSeries[secondSeries.length-1];
-    const y = mapValToY(last, 0, maxSfs);
-    ctx.beginPath(); ctx.setLineDash([5,3]); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
-    ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green-dark'); ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
-  }
-  if (signalStartTime !== null) {
-    const totalTime = lastT - t0;
-    if (totalTime > 0) {
-      const xStart = (signalStartTime / totalTime) * canvas.width;
-      ctx.beginPath(); ctx.setLineDash([5, 3]); ctx.moveTo(xStart, 0); ctx.lineTo(xStart, canvas.height);
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00'; ctx.lineWidth = 3; ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(255,107,0,0.7)'; ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00'; ctx.font = 'bold 12px Arial'; ctx.fillText('Начало', xStart + 5, 15);
-    }
-  }
-  try {
-    const mode = getMode();
-    const refNow = getNormalizationReference();
-    if (mode==='main' && !refNow && cutTimeAbs!==null) {
-      const totalTime = lastT - t0;
-      if (totalTime > 0) {
-        const xCut = (cutTimeAbs / totalTime) * canvas.width;
-        ctx.beginPath(); ctx.setLineDash([4, 4]); ctx.moveTo(xCut, 0); ctx.lineTo(xCut, canvas.height);
-        ctx.strokeStyle = '#444'; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = '#333'; ctx.font = 'bold 12px Arial'; ctx.fillText('+1с', xCut + 5, 45);
-      }
-    }
-  } catch(e) {}
-  if (signalEndTime !== null) {
-    const totalTime = lastT - t0;
-    if (totalTime > 0) {
-      const xEnd = (signalEndTime / totalTime) * canvas.width;
-      ctx.beginPath(); ctx.setLineDash([5, 3]); ctx.moveTo(xEnd, 0); ctx.lineTo(xEnd, canvas.height);
-      ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066'; ctx.lineWidth = 3; ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(255,0,102,0.7)'; ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066'; ctx.font = 'bold 12px Arial'; ctx.fillText('Конец', xEnd + 5, 30);
-    }
-  }
-  if (currentThreshold > 0) {
-    const yThreshold = mapValToY(currentThreshold, 0, maxIfs);
-    ctx.beginPath(); ctx.setLineDash([3, 3]); ctx.moveTo(0, yThreshold); ctx.lineTo(canvas.width, yThreshold);
-    ctx.strokeStyle = '#888'; ctx.lineWidth = 1; ctx.stroke(); ctx.setLineDash([]);
-    ctx.fillStyle = '#666'; ctx.font = '10px Arial'; ctx.fillText(`Порог: ${currentThreshold.toExponential(2)}`, 10, yThreshold - 5);
-  }
-}
+function updateSignalInfo(){ const el=document.getElementById('signalInfo'); el.textContent=composeSignalInfoText(); }
 
 /* Mic */
 async function requestMicrophoneAccess(){
   try{
     micStream=await navigator.mediaDevices.getUserMedia({audio:true});
-    if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-    analyser=audioCtx.createAnalyser(); analyser.fftSize=2048; source=audioCtx.createMediaStreamSource(micStream); source.connect(analyser);
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=audioCtx.createAnalyser(); analyser.fftSize=2048;
+    source=audioCtx.createMediaStreamSource(micStream); source.connect(analyser);
     setStatus(tr('statusMicOk'),'ok');
-  }catch(e){ setStatus(tr('statusMicErr')+e.message,'error'); }
+  }catch(e){ setStatus(tr('statusMicErr')+(e&&e.message?e.message:''),'error'); }
 }
 
-/* Recording */
-let intensityValues=[], integralValues=[];
+/* Recording tick */
 function rms(b){let a=0;for(let v of b)a+=v*v;return Math.sqrt(a/(b.length||1));}
+function detectSignal(intensity, currentIntegral, currentTime){
+  const timeFromStart=currentTime - t0;
+  maxIntensity=Math.max(maxIntensity,intensity);
+  const relThr=Math.max(maxIntensity*getRelativeThresholdFraction(), ABSOLUTE_FLOOR);
+  currentThreshold=relThr;
+  if(!isSignalActive && intensity>relThr){
+    isSignalActive=true; signalStartTime=timeFromStart; lastIntegralValue=currentIntegral; stableCount=0; return 'start';
+  }
+  if(isSignalActive && currentIntegral>0){
+    const relativeChange=Math.abs((currentIntegral-lastIntegralValue)/currentIntegral);
+    if(relativeChange<=getStabilityCriterion()){
+      stableCount++; if(stableCount>=STABLE_SAMPLES_REQUIRED && signalEndTime===null){ isSignalActive=false; signalEndTime=timeFromStart; stableCount=0; return 'end'; }
+    } else { stableCount=0; lastIntegralValue=currentIntegral; }
+  }
+  return null;
+}
+function checkAutoStop(t){
+  const elapsed=t - t0;
+  if(elapsed>=MAX_RECORDING_TIME){ stopRecordingAndFinalize(); setStatus('⏱️ 30 сек. лимит','warn'); return true; }
+  if(signalEndTime!==null){
+    if((elapsed - signalEndTime)>=AUTO_STOP_AFTER_END){ stopRecordingAndFinalize(); setStatus('⏱️ Автостоп','ok'); return true; }
+  }
+  return false;
+}
 function tick(){
   if(!recording) return;
   const buffer=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(buffer);
   const r=rms(buffer), intensity=r*r;
   const t=audioCtx.currentTime, dt=Math.max(0,t-lastT); lastT=t;
-  const relTime = t - t0; sampleTimes.push(relTime);
   const last=(integralValues.length?integralValues[integralValues.length-1]:0);
   const next=last+intensity*dt;
-  intensityValues.push(intensity); integralValues.push(next);
-  if (checkAutoStop(t)) { return; }
-  const signalEvent = detectSignal(intensity, next, t);
-  if (signalEvent === 'start') {
-    cutTimeAbs = signalStartTime + 1.0; cutPointPercent = null;
-    setStatus('🔊 Обнаружено начало сигнала', 'ok');
-  } else if (signalEvent === 'end') {
-    setStatus('🔇 Обнаружен конец сигнала', 'ok');
-  }
+  intensityValues.push(intensity); integralValues.push(next); sampleTimes.push(t - t0);
+  if(checkAutoStop(t)) return;
+  const ev=detectSignal(intensity,next,t);
+  if(ev==='start') setStatus('🔊', 'ok');
+  if(ev==='end') setStatus('🔇', 'ok');
   updateSignalInfo();
   const mode=getMode();
-  if(mode==='normalization'){
-    drawGraph(intensityValues, integralValues, false);
-  }else{
+  if(mode==='normalization'){ drawGraph(intensityValues, integralValues, false); }
+  else{
     const ref=getNormalizationReference();
-    if(ref){
-      const norm=integralValues.map(v=>v/ref);
-      drawGraph(intensityValues, norm, true);
-    }else{
-      const lastNow = integralValues.length ? integralValues[integralValues.length-1] : 1;
-      const norm=integralValues.map(v=>v/(lastNow||1));
-      if (cutTimeAbs !== null && sampleTimes.length>0) {
-        let idx = sampleTimes.findIndex(tt => tt >= cutTimeAbs);
-        if (idx === -1) idx = sampleTimes.length - 1;
-        const val = norm[Math.max(0, idx)] || 0;
-        cutPointPercent = Math.max(0, Math.min(100, val*100));
-      }
-      drawGraph(intensityValues, norm, true);
-    }
+    const lastInt = integralValues[integralValues.length-1] || 1;
+    const norm = ref ? integralValues.map(v=>v/(ref||1)) : integralValues.map(v=>v/(lastInt||1));
+    drawGraph(intensityValues, norm, true);
   }
   rafId=requestAnimationFrame(tick);
 }
-
 function stopRecordingAndFinalize(){
-  recording=false; if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
-  if (isSignalActive && signalStartTime !== null && signalEndTime === null) {
-    signalEndTime = lastT - t0; updateSignalInfo();
-  }
+  recording=false; if(rafId) cancelAnimationFrame(rafId);
+  if(signalStartTime!==null && signalEndTime===null){ signalEndTime=lastT - t0; }
   const mode=getMode();
-  if(mode==='normalization'){
-    const last=integralValues.length?integralValues[integralValues.length-1]:0;
-    addEnergyHistoryEntry(last);
-    setStatus(tr('statusNormOn'),'warn');
-  }else{
+  const last=integralValues.length?integralValues[integralValues.length-1]:0;
+  if(mode==='normalization'){ addEnergyHistoryEntry(last); setStatus(tr('statusNormOn'),'warn'); }
+  else{
     const ref=getNormalizationReference();
-    const last=integralValues.length?integralValues[integralValues.length-1]:0;
-    const norm=ref ? (last/ref) : 1;
-    if (!ref) {
-      const lastNow = last||1;
-      const normSeries = integralValues.map(v=>v/(lastNow||1));
-      const ds = _downsampleSeries(normSeries, 200);
-      let cutPct = null;
-      if (cutTimeAbs !== null && sampleTimes.length>0) {
-        let idx = sampleTimes.findIndex(tt => tt >= cutTimeAbs);
-        if (idx === -1) idx = sampleTimes.length-1;
-        const val = normSeries[Math.max(0, idx)] || 0;
-        cutPct = Math.max(0, Math.min(100, val*100));
-      }
-      const d = new Date(); d.setSeconds(0,0);
-      const h = loadEnergyHistoryMain();
-      h.push({ts:d.toISOString(), norm:Number(norm)||0, cut:cutPct, series:ds});
-      saveEnergyHistoryMain(h);
-    } else {
-      addEnergyHistoryEntryMain(norm);
-    }
+    const norm = ref ? (last/(ref||1)) : 1;
+    addEnergyHistoryEntryMain(norm);
     setStatus(tr('statusMainDone'),'ok');
   }
   drawEnergyHistory();
-  hideLowIntensityWarning();
 }
-
-/* Reset */
 function resetRecording(){
-  recording=false; t0=0; lastT=0; intensityValues=[]; integralValues=[]; sampleTimes=[]; cutTimeAbs=null; cutPointPercent=null;
-  signalStartTime = null; signalEndTime = null; isSignalActive = false; maxIntensity = 0; lastIntegralValue = 0; stableCount = 0; currentThreshold = 0;
-  if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
-  updateSignalInfo(); setThresholdInfo('Current threshold: —');
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  setStatus(tr('statusReset'),'ok'); hideLowIntensityWarning();
+  recording=false; if(rafId) cancelAnimationFrame(rafId);
+  intensityValues=[]; integralValues=[]; sampleTimes=[];
+  signalStartTime=null; signalEndTime=null; isSignalActive=false;
+  lastIntegralValue=0; stableCount=0; maxIntensity=0; currentThreshold=0; t0=0; lastT=0;
+  ctx.clearRect(0,0,canvas.width,canvas.height); updateSignalInfo();
+  setStatus(tr('statusReset'),'ok');
 }
 
-/* Init */
-function initI18n(){
-  const sel=document.getElementById('langSelect'); if(!sel) return;
-  const saved=localStorage.getItem(LANG_KEY)||'ru';
-  sel.value=saved; applyTranslations(saved);
-  sel.addEventListener('change',e=>{ applyTranslations(e.target.value); try{ drawEnergyHistory(); }catch(_){}});
+/* Robust SHARE (HTML-only) — tolerant, embeds data, multiple fallbacks */
+function collectHistoriesForExport(){
+  let norm = []; try{ norm = loadEnergyHistory() || []; }catch(_){ norm = []; }
+  let main = []; try{ main = loadEnergyHistoryMain() || []; }catch(_){ main = []; }
+  return {normHist:Array.isArray(norm)?norm:[], mainHist:Array.isArray(main)?main:[]};
 }
-function init(){
-  initI18n(); applyMode();
-  const slider = document.getElementById('thrSlider');
-  const out = document.getElementById('thrValue');
-  const s2 = document.getElementById('stabSlider');
-  const o2 = document.getElementById('stabValue');
-  if(btnRequestMic) btnRequestMic.addEventListener('click',requestMicrophoneAccess);
-  if(btnStart) btnStart.addEventListener('click',()=>{
-    if(!analyser){ setStatus('Сначала разрешите микрофон.','error'); return; }
-    resetRecording();
-    recording=true; t0=audioCtx.currentTime; lastT=t0;
-    setStatus(tr('statusRec'),'ok');
-    tick();
-  });
-  if(btnStop) btnStop.addEventListener('click',stopRecordingAndFinalize);
-  if(btnReset) btnReset.addEventListener('click',resetRecording);
-  if(btnStartNorm) btnStartNorm.addEventListener('click',()=>setMode('normalization'));
-  if(btnFinishNorm) btnFinishNorm.addEventListener('click',()=>setMode('main'));
-  if(btnTech) btnTech.addEventListener('click', openTech);
-  if(btnCloseTech) btnCloseTech.addEventListener('click', ()=>{ closeTech(); });
-  if(techModal){
-    techModal.addEventListener('click', closeTech);
-    window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeTech(); });
-  }
-  // Initialize threshold slider (technical modal)
-  try{
-    if (slider && out){
-      const pct = getThresholdPct();
-      slider.value = String(pct);
-      out.textContent = pct.toFixed(1) + '%';
-      slider.addEventListener('input', (e)=>{
-        const v = parseFloat(e.target.value);
-        setThresholdPct(v);
-        out.textContent = v.toFixed(1) + '%';
-        const rel = Math.max(maxIntensity * getRelativeThresholdFraction(), ABSOLUTE_FLOOR);
-        setThresholdInfo(`Current threshold: ${rel.toExponential(2)} (${getThresholdPct().toFixed(1)}% of max ${maxIntensity>0?maxIntensity.toExponential(2):'—'})`);
-      });
-    }
-  }catch(e){}
-  // Initialize stability slider (technical modal)
-  try{
-    if (s2 && o2){
-      const pct2 = getStabilityPct();
-      s2.value = String(pct2);
-      o2.textContent = pct2.toFixed(2) + '%';
-      s2.addEventListener('input', (e)=>{
-        const v = parseFloat(e.target.value);
-        setStabilityPct(v);
-        o2.textContent = v.toFixed(2) + '%';
-      });
-    }
-  }catch(e){} 
-  drawEnergyHistory();
-  // Ensure modal is English at startup:
-  try{
-    const tt=document.getElementById('techTitle'); if(tt) tt.textContent='Technical settings';
-    const bc=document.getElementById('btnCloseTech'); if(bc) bc.textContent='Close';
-    const ti=document.getElementById('thresholdInfo'); if(ti && (ti.textContent.trim()===''||ti.textContent.includes('—'))) ti.textContent='Current threshold: —';
-  }catch(e){}
-}
-window.addEventListener('load',init);
-</script>
-<script>
-/* ===== HTML-only export (tolerant if one history is empty) =====
-   - Always exports, even if normalization or main history is empty
-   - Embeds data into report (no dependency on localStorage)
-   - Energy chart uses P95 auto-clip; energy table uses scientific notation
-*/
-(function(){
-  function percentile(a,p){a=a.slice().filter(v=>isFinite(v)).sort((x,y)=>x-y);if(!a.length)return 0;const i=(p/100)*(a.length-1);const lo=Math.floor(i),hi=Math.ceil(i);if(lo===hi)return a[lo];const w=i-lo;return a[lo]*(1-w)+a[hi]*w;}
-  function niceNum(r,round){const e=Math.floor(Math.log10(r||1)),f=(r/Math.pow(10,e))||1;let nf;if(round){if(f<1.5)nf=1;else if(f<3)nf=2;else if(f<7)nf=5;else nf=10;}else{if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=5)nf=5;else nf=10;}return nf*Math.pow(10,e);}
-  function niceAxis(a,b,n){if(a===b){b=a+1;}const rg=niceNum(b-a,false),st=niceNum(rg/(n-1),true),g0=Math.floor(a/st)*st,g1=Math.ceil(b/st)*st;const t=[];for(let v=g0;v<=g1+0.5*st;v+=st)t.push(v);return{min:g0,max:g1,step:st,ticks:t};}
-  function tryParseJSON(s){ try{ return JSON.parse(s);}catch(_){ return null; } }
-
-  function collectFromLocalStorage(){
-    let bestNorm=[], bestMain=[];
-    for(let i=0;i<localStorage.length;i++){
-      const k = localStorage.key(i);
-      const val = tryParseJSON(localStorage.getItem(k));
-      if(Array.isArray(val) && val.length){
-        const sample = val[0]||{};
-        if('energy' in sample){ if(val.length>bestNorm.length) bestNorm = val; }
-        if('norm' in sample || 'normalized' in sample){ if(val.length>bestMain.length) bestMain = val; }
-      }
-    }
-    bestMain = bestMain.map(r=>({ts:r.ts||r.time||r.date||new Date().toISOString(), norm:('norm' in r)?r.norm:(r.normalized||null), cut:r.cut}));
-    bestNorm = bestNorm.map(r=>({ts:r.ts||r.time||r.date||new Date().toISOString(), energy:r.energy}));
-    return {normHist:bestNorm||[], mainHist:bestMain||[]};
-  }
-
-  function collectHistories(){
-    let normHist = [], mainHist = [];
-    try{ if(typeof loadEnergyHistory==='function'){ normHist = loadEnergyHistory() || []; } }catch(_){}
-    try{ if(typeof loadEnergyHistoryMain==='function'){ mainHist = loadEnergyHistoryMain() || []; } }catch(_){}
-    if(!(normHist && normHist.length) || !(mainHist && mainHist.length)){
-      const r = collectFromLocalStorage();
-      if(!normHist.length) normHist = r.normHist;
-      if(!mainHist.length) mainHist = r.mainHist;
-    }
-    // ensure arrays even if empty
-    return {normHist: Array.isArray(normHist)?normHist:[], mainHist: Array.isArray(mainHist)?mainHist:[]};
-  }
-
-  function exportHTMLReport(){
-    const {normHist, mainHist} = collectHistories();
-    const norm = JSON.stringify(normHist).replace(/</g,'\\u003C');
-    const main = JSON.stringify(mainHist).replace(/</g,'\\u003C');
-    const parts = [];
-    parts.push('<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Acoustic Share Report</title>');
-    parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
-    parts.push('<style>body{font-family:Arial,sans-serif;margin:20px;}h1{font-size:20px;margin:0 0 6px 0;}h2{font-size:16px;margin:14px 0 6px 0;}canvas{border:1px solid #ddd;border-radius:6px;width:100%;height:260px;}table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #ccc;padding:6px 8px;}th{background:#f5f5f5;}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}.legend{display:flex;gap:14px;align-items:center;margin:6px 0 2px 0;font-size:12px;color:#333}.chip{width:12px;height:12px;border-radius:2px;display:inline-block;border:1px solid #999}.c-energy{background:#cfe8ff;border-color:#6aa0ff}.c-norm{background:#d7f5e3;border-color:#42a362}.c-cut{background:#ffd7e8;border-color:#ff66a3}.bg-red{background:rgba(255,0,0,0.08)}.bg-yellow{background:rgba(255,215,0,0.10)}.bg-green{background:rgba(0,128,0,0.10)}.card{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0;}.note{margin:8px 0 0 2px;color:#666;font-size:12px;}</style>');
-    parts.push('</head><body>');
-    parts.push('<h1>Акустический спироанализатор — отчёт</h1>');
-    parts.push('<div>Дата формирования: ' + new Date().toLocaleString() + '</div>');
-
-    parts.push('<div class="card"><h2>История нормирования</h2>');
-    parts.push('<div class="legend"><span class="chip c-energy"></span> Интегральная энергия</div>');
-    if(!('+norm+').length){/*placeholder*/}
-    parts.push('<div class="grid"><canvas id="cnNorm" width="800" height="260"></canvas>');
-    parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Energy (sci)</th></tr></thead><tbody id="tbNorm"></tbody></table>');
-    parts.push('<div class="note" id="noteNorm"></div></div></div></div>');
-
-    parts.push('<div class="card"><h2>История основного режима</h2>');
-    parts.push('<div class="legend"><span class="chip c-norm"></span> Нормированная асимптота <span class="chip c-cut"></span> Точка отсечения</div>');
-    parts.push('<div class="grid"><canvas id="cnMain" width="800" height="260"></canvas>');
-    parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Norm</th><th>Cut, %</th></tr></thead><tbody id="tbMain"></tbody></table>');
-    parts.push('<div class="note" id="noteMain"></div></div></div></div>');
-
-    parts.push('<script>');
-    parts.push('const dataNorm = ' + norm + '; const dataMain = ' + main + ';');
-    parts.push(`
+function buildReportHTML(normHist, mainHist){
+  const norm = JSON.stringify(normHist).replace(/</g,'\\u003C');
+  const main = JSON.stringify(mainHist).replace(/</g,'\\u003C');
+  const parts = [];
+  parts.push('<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Acoustic Share Report</title>');
+  parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
+  parts.push('<style>body{font-family:Arial,sans-serif;margin:20px;}h1{font-size:20px;margin:0 0 6px 0;}h2{font-size:16px;margin:14px 0 6px 0;}canvas{border:1px solid #ddd;border-radius:6px;width:100%;height:260px;}table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #ccc;padding:6px 8px;}th{background:#f5f5f5;}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}.legend{display:flex;gap:14px;align-items:center;margin:6px 0 2px 0;font-size:12px;color:#333}.chip{width:12px;height:12px;border-radius:2px;display:inline-block;border:1px solid #999}.c-energy{background:#cfe8ff;border-color:#6aa0ff}.c-norm{background:#d7f5e3;border-color:#42a362}.c-cut{background:#ffd7e8;border-color:#ff66a3}.bg-red{background:rgba(255,0,0,0.08)}.bg-yellow{background:rgba(255,215,0,0.10)}.bg-green{background:rgba(0,128,0,0.10)}.card{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0;}.note{margin:8px 0 0 2px;color:#666;font-size:12px;}</style>');
+  parts.push('</head><body>');
+  parts.push('<h1>Акустический спироанализатор — отчёт</h1>');
+  parts.push('<div>Дата формирования: ' + new Date().toLocaleString() + '</div>');
+  parts.push('<div class="card"><h2>История нормирования</h2>');
+  parts.push('<div class="legend"><span class="chip c-energy"></span> Интегральная энергия</div>');
+  parts.push('<div class="grid"><canvas id="cnNorm" width="800" height="260"></canvas>');
+  parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Energy (sci)</th></tr></thead><tbody id="tbNorm"></tbody></table>');
+  parts.push('<div class="note" id="noteNorm"></div></div></div></div>');
+  parts.push('<div class="card"><h2>История основного режима</h2>');
+  parts.push('<div class="legend"><span class="chip c-norm"></span> Нормированная асимптота <span class="chip c-cut"></span> Точка отсечения</div>');
+  parts.push('<div class="grid"><canvas id="cnMain" width="800" height="260"></canvas>');
+  parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Norm</th><th>Cut, %</th></tr></thead><tbody id="tbMain"></tbody></table>');
+  parts.push('<div class="note" id="noteMain"></div></div></div></div>');
+  const closeScript = '<' + '/script>';
+  parts.push('<script>');
+  parts.push('const dataNorm = ' + norm + '; const dataMain = ' + main + ';');
+  parts.push(`
 function percentile(a,p){a=a.slice().filter(v=>isFinite(v)).sort((x,y)=>x-y);if(!a.length)return 0;const i=(p/100)*(a.length-1);const lo=Math.floor(i),hi=Math.ceil(i);if(lo===hi)return a[lo];const w=i-lo;return a[lo]*(1-w)+a[hi]*w;}
 function niceNum(r,round){const e=Math.floor(Math.log10(r||1)),f=(r/Math.pow(10,e))||1;let nf;if(round){if(f<1.5)nf=1;else if(f<3)nf=2;else if(f<7)nf=5;else nf=10;}else{if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=5)nf=5;else nf=10;}return nf*Math.pow(10,e);}
 function niceAxis(a,b,n){if(a===b){b=a+1;}const rg=niceNum(b-a,false),st=niceNum(rg/(n-1),true),g0=Math.floor(a/st)*st,g1=Math.ceil(b/st)*st;const t=[];for(let v=g0;v<=g1+0.5*st;v+=st)t.push(v);return{min:g0,max:g1,step:st,ticks:t};}
@@ -852,31 +469,96 @@ function fillTableMain(tid, rows){
   drawHistory('cnMain', mainRows, true);
   fillTableMain('tbMain', mainRows);
 })();`);
-    parts.push('<\/script>');
-    parts.push('</body></html>');
-
-    const blob = new Blob([parts.join("")], {type:'text/html;charset=utf-8'});
+  parts.push(closeScript + '>');
+  parts.push('</body></html>');
+  return parts.join("");
+}
+function tryDownload(filename, html){
+  try{
+    const blob = new Blob([html], {type:'text/html;charset=utf-8'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url;
-    const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
-    a.download = 'acoustic_share_'+stamp+'.html';
-    document.body.appendChild(a); a.click();
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
     setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+    return true;
+  }catch(err){ console.warn('Blob download blocked:', err); return false; }
+}
+function tryOpenNewTab(html){
+  const w = window.open('', '_blank');
+  if(!w){ return false; }
+  try{
+    w.document.open('text/html', 'replace');
+    w.document.write(html);
+    w.document.close();
+    return true;
+  }catch(err){
+    try{ w.close(); }catch(_){}
+    console.warn('Open new tab blocked:', err);
+    return false;
   }
+}
+function exportHTMLReport(){
+  const {normHist, mainHist} = collectHistoriesForExport();
+  const html = buildReportHTML(normHist, mainHist);
+  const stamp = new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+  const filename = 'acoustic_share_'+stamp+'.html';
+  if (tryDownload(filename, html)) return;
+  if (tryOpenNewTab(html)) return;
+  const ta=document.createElement('textarea'); ta.style.cssText='position:fixed;inset:10px;z-index:99999'; ta.value=html; document.body.appendChild(ta);
+  alert('Сайт блокирует загрузку. Выделите и скопируйте HTML, сохраните как '+filename);
+}
 
-  function ensureShareButton(){
-    const target = document.getElementById('btnTech')?.parentElement || document.querySelector('.toolbar') || document.body;
-    const btn = document.createElement('button');
-    btn.id = 'btnShare';
-    btn.className = 'button';
-    btn.textContent = 'Поделиться';
-    btn.addEventListener('click', exportHTMLReport);
-    target.appendChild(btn);
-  }
-  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', ensureShareButton); }
-  else { ensureShareButton(); }
-})();
+/* UI wiring */
+function init(){
+  const sel=document.getElementById('langSelect');
+  const saved=(localStorage.getItem(LANG_KEY)||'ru'); sel.value=saved; applyTranslations(saved);
+  sel.addEventListener('change', e=>applyTranslations(e.target.value));
 
+  document.getElementById('btnRequestMic').addEventListener('click', requestMicrophoneAccess);
+  document.getElementById('btnStart').addEventListener('click', ()=>{
+    if(!analyser){ setStatus('Сначала разрешите микрофон.','error'); return; }
+    resetRecording();
+    recording=true; t0=audioCtx.currentTime; lastT=t0;
+    setStatus('🟢 Запись…','ok');
+    requestAnimationFrame(function loop(){ tick(); });
+  });
+  document.getElementById('btnStop').addEventListener('click', stopRecordingAndFinalize);
+  document.getElementById('btnReset').addEventListener('click', resetRecording);
+  document.getElementById('btnStartNorm').addEventListener('click', ()=>setMode('normalization'));
+  document.getElementById('btnFinishNorm').addEventListener('click', ()=>setMode('main'));
+  document.getElementById('btnResetLast').addEventListener('click', ()=>{
+    const mode=getMode();
+    if(mode==='main'){ const h=loadEnergyHistoryMain(); if(h.length){ h.pop(); saveEnergyHistoryMain(h); } }
+    else{ const h=loadEnergyHistory(); if(h.length){ h.pop(); saveEnergyHistory(h); } }
+    drawEnergyHistory();
+  });
+
+  // Tech modal
+  const techModal=document.getElementById('techModal');
+  document.getElementById('btnTech').addEventListener('click', ()=>{
+    const rel = Math.max(maxIntensity * getRelativeThresholdFraction(), ABSOLUTE_FLOOR);
+    document.getElementById('thresholdInfo').textContent = 'Current threshold: ' + (rel?rel.toExponential(2):'—');
+    document.getElementById('thrSlider').value = String(getThresholdPct());
+    document.getElementById('thrValue').textContent = getThresholdPct().toFixed(1) + '%';
+    document.getElementById('stabSlider').value = String(getStabilityPct());
+    document.getElementById('stabValue').textContent = getStabilityPct().toFixed(2) + '%';
+    techModal.style.display='block';
+  });
+  document.getElementById('btnCloseTech').addEventListener('click', ()=> techModal.style.display='none');
+  techModal.addEventListener('click', ()=> techModal.style.display='none');
+  document.querySelector('#techModal .modal-card').addEventListener('click', e=>e.stopPropagation());
+
+  // Share
+  document.getElementById('btnShare').addEventListener('click', exportHTMLReport);
+
+  drawEnergyHistory();
+}
+window.addEventListener('load', init);
 </script>
 </body>
 </html>
