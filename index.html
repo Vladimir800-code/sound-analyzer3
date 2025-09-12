@@ -38,7 +38,7 @@
   #langBox{position:absolute; right:12px; top:10px;}
   #langSelect{padding:6px 10px; border-radius:6px; border:1px solid #ccc;}
   .signal-info{margin:8px 12px; padding:8px; background:#f9f9f9; border-radius:6px; font-family:monospace; font-size:13px;}
-  .threshold-info{margin:4px 12px; padding:6px; background:#f0f8ff; border-radius:4px; font-family:monospace; font-size:12px; color:#0066cc;}
+  .threshold-info{margin:4px 0; padding:6px; background:#f0f8ff; border-radius:4px; font-family:monospace; font-size:12px; color:#0066cc;}
   
   /* Яркое мигающее предупреждение */
   .low-intensity-warning {
@@ -78,6 +78,42 @@
     margin-bottom: 10px;
     display: block;
   }
+
+  /* ===== Modal (Technical Settings) ===== */
+  .modal-backdrop{
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    display: none;
+    z-index: 1200;
+  }
+  .modal-card{
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #ddd;
+    width: min(560px, 92vw);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+  }
+  .modal-header{
+    padding: 12px 16px;
+    border-bottom: 1px solid #eee;
+    display:flex; align-items:center; gap:8px;
+  }
+  .modal-title{
+    font-weight: 700; font-size:16px;
+  }
+  .modal-body{
+    padding: 14px 16px 18px;
+  }
+  .modal-actions{
+    padding: 10px 16px;
+    border-top: 1px solid #eee;
+    display:flex; justify-content:flex-end; gap:8px;
+  }
 </style>
 </head>
 <body>
@@ -106,10 +142,10 @@
     <button id="btnStart" class="button">Начать запись</button>
     <button id="btnStop" class="button">Остановить</button>
     <button id="btnReset" class="button">Сброс</button>
+    <button id="btnTech" class="button">Технические настройки</button>
   </div>
 
   <div class="status" id="status">Готов.</div>
-  <div class="threshold-info" id="thresholdInfo">Текущий порог: —</div>
 
   <!-- Основной график -->
   <canvas id="mainGraph" width="980" height="340"></canvas>
@@ -128,6 +164,25 @@
   </section>
 </main>
 
+<!-- ===== Technical Settings Modal ===== -->
+<div id="techModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="techTitle">
+  <div class="modal-card" onclick="event.stopPropagation();">
+    <div class="modal-header">
+      <span id="techTitle" class="modal-title">Технические настройки</span>
+    </div>
+    <div class="modal-body">
+      <!-- Threshold moved here (hidden from main UI) -->
+      <div class="threshold-info" id="thresholdInfo">Current threshold: —</div>
+      <div style="font-size:12px;color:#666;margin-top:8px;">
+        * Threshold is computed as the maximum of 5% of the current max intensity and an absolute floor.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button id="btnCloseTech" class="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Яркое мигающее предупреждение -->
 <div id="lowIntensityWarning" class="low-intensity-warning" style="display: none;">
   <span class="warning-icon">⚠️</span>
@@ -140,13 +195,26 @@
 const LANG_KEY='ui_lang_v1';
 function currLang(){ return localStorage.getItem(LANG_KEY)||'ru'; }
 const translations={
-  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",thresholdInfo:"Текущий порог: —"},
-  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s",thresholdInfo:"Current threshold: —"},
-  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מ�נורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusNormOn:"🟡 מצב נרמול.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",thresholdInfo:"סף נוכחי: —"}
+  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",thresholdInfo:"Текущий порог: —",techSettings:"Технические настройки",techTitle:"Технические настройки",close:"Закрыть"},
+  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s",thresholdInfo:"Current threshold: —",techSettings:"Technical settings",techTitle:"Technical settings",close:"Close"},
+  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusNormOn:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",thresholdInfo:"סף נוכחי: —",techSettings:"הגדרות טכניות",techTitle:"הגדרות טכניות",close:"סגור"}
 };
+// Inject localized labels for the signal info line (safer than editing the object literal)
+try {
+  translations.ru.startLabel="Начало"; translations.ru.endLabel="Конец"; translations.ru.durationLabel="Длительность"; translations.ru.cutLabel="Точка отсечения"; translations.ru.secUnit="с";
+  translations.en.startLabel="Start"; translations.en.endLabel="End"; translations.en.durationLabel="Duration"; translations.en.cutLabel="Cutoff point"; translations.en.secUnit="s";
+  translations.he.startLabel="התחלה"; translations.he.endLabel="סוף"; translations.he.durationLabel="משך"; translations.he.cutLabel="נקודת חיתוך"; translations.he.secUnit="ש";
+} catch(e) {}
+
 function tr(key){ try{ return (translations[currLang()]||translations.ru)[key] || key; }catch(e){ return key; } }
 function setStatus(msg, level='ok'){ const el=document.getElementById('status'); el.className='status '+(level||'ok'); el.textContent=msg; }
-function setThresholdInfo(msg){ const el=document.getElementById('thresholdInfo'); if(el) el.textContent=msg; }
+function setThresholdInfo(msg){
+  const el=document.getElementById('thresholdInfo');
+  if(el){
+    // Always English in the technical modal:
+    el.textContent = msg;
+  }
+}
 function textMatches(el,vars){const t=(el.textContent||'').trim();return vars.some(v=>v===t);}
 function findOrBindButton(id,keys){let el=document.getElementById(id);if(el)return el;const btns=Array.from(document.querySelectorAll('button'));for(const b of btns){if(textMatches(b,keys)){b.id=id;return b;}}return null;}
 function applyTranslations(lang){
@@ -163,16 +231,23 @@ function applyTranslations(lang){
   const hh=document.querySelector('#historySection .hint'); if(hh) hh.textContent=t.historyHint;
   const si=document.getElementById('signalInfo'); if(si && !si.textContent.includes(':')) si.textContent=t.signalInfo;
   const ti=document.getElementById('thresholdInfo'); if(ti && !ti.textContent.includes(':')) ti.textContent=t.thresholdInfo;
+  const bTech=findOrBindButton('btnTech',[translations.ru.techSettings,translations.en.techSettings,translations.he.techSettings]); if(bTech) bTech.textContent=t.techSettings;
+  const techTitle=document.getElementById('techTitle'); if(techTitle) techTitle.textContent=t.techTitle;
+  const btnCloseTech=document.getElementById('btnCloseTech'); if(btnCloseTech) btnCloseTech.textContent=t.close;
 
   // RTL/LTR + persist
   document.body.dir=(lang==='he')?'rtl':'ltr';
   localStorage.setItem(LANG_KEY,lang);
 
-  // ✅ мгновенно обновляем бейдж режима и историю (легенды)
-  try { modeBadge.textContent = (getMode()==='normalization') ? tr('modeBadgeNorm') : tr('modeBadgeMain'); } catch(e){}
+  try{ updateSignalInfo(); }catch(e){} 
+  // Keep technical modal always in English
+  try{
+    const tt=document.getElementById('techTitle'); if(tt) tt.textContent='Technical settings';
+    const bc=document.getElementById('btnCloseTech'); if(bc) bc.textContent='Close';
+    const ti=document.getElementById('thresholdInfo'); if(ti && (ti.textContent.trim()===''||ti.textContent.includes('—'))) ti.textContent='Current threshold: —';
+  }catch(e){}try { modeBadge.textContent = (getMode()==='normalization') ? tr('modeBadgeNorm') : tr('modeBadgeMain'); } catch(e){}
   try { drawEnergyHistory(); } catch(e){}
 
-  // статус "готов"
   try{ setStatus(t.ready,'ok'); }catch(e){}
 }
 function initI18n(){
@@ -180,17 +255,16 @@ function initI18n(){
   const saved=localStorage.getItem(LANG_KEY)||'ru';
   sel.value=saved; applyTranslations(saved);
   sel.addEventListener('change',e=>{
-    applyTranslations(e.target.value);          // уже обновляет бейдж + историю
+    applyTranslations(e.target.value);
     try{ drawEnergyHistory(); }catch(_){}
   });
 }
 
 /* ===== Глобальные переменные / режимы ===== */
 let audioCtx=null, micStream=null, analyser=null, source=null, rafId=null;
-// Добавлено: массив временных меток, отсечка +1с и проценты в точке отсечения
 let sampleTimes=[];
-let cutTimeAbs=null;          // абсолютное время (сек) относительно t0: (signalStartTime + 1)
-let cutPointPercent=null;     // значение нормированной интегральной энергии в точке отсечения, % (0..100)
+let cutTimeAbs=null;
+let cutPointPercent=null;
 
 let recording=false, t0=0, lastT=0;
 let signalStartTime = null;
@@ -216,58 +290,50 @@ const btnReset=document.getElementById('btnReset');
 const btnStartNorm=document.getElementById('btnStartNorm');
 const btnFinishNorm=document.getElementById('btnFinishNorm');
 const btnResetLast=document.getElementById('btnResetLast');
+const btnTech=document.getElementById('btnTech');
+const btnCloseTech=document.getElementById('btnCloseTech');
+const techModal=document.getElementById('techModal');
 const signalInfoEl = document.getElementById('signalInfo');
 const lowIntensityWarning = document.getElementById('lowIntensityWarning');
 
-// Параметры для определения сигнала
-const MIN_RELATIVE_THRESHOLD = 0.05; // 5% от макс. интенсивности
-const ABSOLUTE_FLOOR = 0.001; // Нижний абсолютный предел
-const INTEGRAL_STABILITY_THRESHOLD = 0.01; // 1% отклонение от асимптотического значения
-const STABLE_SAMPLES_REQUIRED = 10; // Количество стабильных отсчетов для определения конца
-const AUTO_STOP_AFTER_END = 3.0; // Автостоп через 3 сек после конца сигнала
-const MAX_RECORDING_TIME = 30.0; // Максимальная длительность записи 30 сек
+const MIN_RELATIVE_THRESHOLD = 0.05;
+const ABSOLUTE_FLOOR = 0.001;
+const INTEGRAL_STABILITY_THRESHOLD = 0.01;
+const STABLE_SAMPLES_REQUIRED = 10;
+const AUTO_STOP_AFTER_END = 3.0;
+const MAX_RECORDING_TIME = 30.0;
 
 function getMode(){const v=localStorage.getItem(MODE_KEY); return (v==='main'||v==='normalization')?v:'normalization';}
 function setMode(v){localStorage.setItem(MODE_KEY,v); applyMode();}
 function applyMode(){const mode=getMode(); modeBadge.textContent=(mode==='normalization')?tr('modeBadgeNorm'):tr('modeBadgeMain'); document.body.setAttribute('data-mode',mode); drawEnergyHistory();}
 
-/* ===== Управление мигающим предупреждением ===== */
+/* ===== Предупреждение ===== */
 function showLowIntensityWarning() {
   if (!lowIntensityWarningActive) {
     lowIntensityWarningActive = true;
     lowIntensityWarning.style.display = 'block';
-    
-    // Автоматическое скрытие через 5 секунд
     if (warningTimeout) clearTimeout(warningTimeout);
-    warningTimeout = setTimeout(() => {
-      hideLowIntensityWarning();
-    }, 5000);
+    warningTimeout = setTimeout(() => { hideLowIntensityWarning(); }, 5000);
   }
 }
-
 function hideLowIntensityWarning() {
   lowIntensityWarningActive = false;
   lowIntensityWarning.style.display = 'none';
-  if (warningTimeout) {
-    clearTimeout(warningTimeout);
-    warningTimeout = null;
-  }
+  if (warningTimeout) { clearTimeout(warningTimeout); warningTimeout = null; }
 }
 
-/* ===== Автоматическая остановка ===== */
+/* ===== Technical Settings modal ===== */
+function openTech(){ techModal.style.display='block'; }
+function closeTech(){ techModal.style.display='none'; }
+
+/* ===== Автостоп ===== */
 function checkAutoStop(currentTime) {
   const elapsedTime = currentTime - t0;
-  
-  // Проверка максимального времени записи
   if (elapsedTime >= MAX_RECORDING_TIME) {
     setStatus('⏱️ Максимальное время записи (30 сек) достигнуто', 'warn');
     stopRecordingAndFinalize();
     return true;
   }
-  
-  // Проверка автостопа после конца сигнала
-
-  // Вертикаль отсечения в момент (Начало + 1 сек) при самонормировании по единице
   try {
     const mode = getMode();
     const refNow = getNormalizationReference();
@@ -289,7 +355,6 @@ function checkAutoStop(currentTime) {
       }
     }
   } catch(e) {}
-
   if (signalEndTime !== null) {
     const timeSinceEnd = elapsedTime - signalEndTime;
     if (timeSinceEnd >= AUTO_STOP_AFTER_END) {
@@ -298,37 +363,25 @@ function checkAutoStop(currentTime) {
       return true;
     }
   }
-  
   return false;
 }
 
-/* ===== Определение начала и конца сигнала ===== */
+/* ===== Детекция сигнала ===== */
 function detectSignal(intensity, currentIntegral, currentTime) {
   const timeFromStart = currentTime - t0;
-  
-  // Обновляем максимальную интенсивность
   maxIntensity = Math.max(maxIntensity, intensity);
-  
-  // Динамический порог обнаружения (5% от макс. интенсивности, но не ниже ABSOLUTE_FLOOR)
   const relativeThreshold = Math.max(maxIntensity * MIN_RELATIVE_THRESHOLD, ABSOLUTE_FLOOR);
   currentThreshold = relativeThreshold;
-  
-  // Обновляем информацию о пороге
-  setThresholdInfo(`Текущий порог: ${relativeThreshold.toExponential(2)} (${(MIN_RELATIVE_THRESHOLD*100).toFixed(0)}% от макс. ${maxIntensity.toExponential(2)})`);
-  
-  // Проверка на низкую интенсивность сигнала
+  setThresholdInfo(`Current threshold: ${relativeThreshold.toExponential(2)} (${(MIN_RELATIVE_THRESHOLD*100).toFixed(0)}% of max ${maxIntensity.toExponential(2)})`);
   if (maxIntensity < ABSOLUTE_FLOOR * 2) {
     setStatus('⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА! Увеличьте громкость.', 'warn');
     showLowIntensityWarning();
   } else {
-    // Сбрасываем предупреждение, если интенсивность нормальная
     if (document.getElementById('status').textContent.includes('НИЗКАЯ ИНТЕНСИВНОСТЬ')) {
       setStatus(tr('statusRec'), 'ok');
     }
     hideLowIntensityWarning();
   }
-  
-  // Определяем начало сигнала
   if (!isSignalActive && intensity > relativeThreshold) {
     isSignalActive = true;
     signalStartTime = timeFromStart;
@@ -336,69 +389,88 @@ function detectSignal(intensity, currentIntegral, currentTime) {
     stableCount = 0;
     return 'start';
   }
-  
-  // Определяем конец сигнала по стабильности интегральной кривой
   if (isSignalActive && currentIntegral > 0) {
     const relativeChange = Math.abs((currentIntegral - lastIntegralValue) / currentIntegral);
-    
     if (relativeChange <= INTEGRAL_STABILITY_THRESHOLD) {
       stableCount++;
-      
       if (stableCount >= STABLE_SAMPLES_REQUIRED && signalEndTime === null) {
         isSignalActive = false;
-        // Берем время, когда началась стабильность (минус количество стабильных отсчетов)
         signalEndTime = timeFromStart - (stableCount * (currentTime - lastT));
         stableCount = 0;
         return 'end';
       }
     } else {
-      // Сброс счетчика стабильности при изменении
       stableCount = 0;
       lastIntegralValue = currentIntegral;
     }
   }
-  
-  // Защита от повторного начала после конца
   if (signalEndTime !== null && intensity > relativeThreshold) {
-    // Если сигнал уже закончился, но интенсивность снова превысила порог,
-    // это может быть шумом или новым сигналом - игнорируем для текущей реализации
     return null;
   }
-  
   return null;
 }
 
-function updateSignalInfo() {
+
+function composeSignalInfoText(){
+  const startLbl = tr('startLabel');
+  const endLbl = tr('endLabel');
+  const durLbl = tr('durationLabel');
+  const cutLbl = tr('cutLabel');
+  const sec = tr('secUnit');
   if (signalStartTime !== null && signalEndTime !== null) {
     const duration = signalEndTime - signalStartTime;
-    signalInfoEl.textContent = `Начало: ${signalStartTime.toFixed(2)} с, Конец: ${signalEndTime.toFixed(2)} с, Длительность: ${duration.toFixed(2)} с`;
+    let line = `${startLbl}: ${signalStartTime.toFixed(2)} ${sec}, ${endLbl}: ${signalEndTime.toFixed(2)} ${sec}, ${durLbl}: ${duration.toFixed(2)} ${sec}`;
+    try {
+      const mode = getMode();
+      if (mode==='main' && !getNormalizationReference() && cutPointPercent!=null) {
+        line += `, ${cutLbl}: ${cutPointPercent.toFixed(1)}%`;
+      }
+    } catch(e) {}
+    return line;
   } else if (signalStartTime !== null) {
-    const currentTime = audioCtx ? audioCtx.currentTime - t0 : 0;
-    signalInfoEl.textContent = `Начало: ${signalStartTime.toFixed(2)} с, Конец: — с, Длительность: — с`;
+    let line = `${startLbl}: ${signalStartTime.toFixed(2)} ${sec}, ${endLbl}: — ${sec}, ${durLbl}: — ${sec}`;
+    try {
+      const mode = getMode();
+      if (mode==='main' && !getNormalizationReference() && cutPointPercent!=null) {
+        line += `, ${cutLbl}: ${cutPointPercent.toFixed(1)}%`;
+      }
+    } catch(e) {}
+    return line;
   } else {
-    signalInfoEl.textContent = tr('signalInfo');
+    return tr('signalInfo');
   }
-  
-  // Добавляем «Точка отсечения» в запись при самонормировании
-  try {
-    const mode = getMode();
-    if (mode==='main' && !getNormalizationReference() && cutPointPercent!=null) {
-      signalInfoEl.textContent += `, Точка отсечения: ${cutPointPercent.toFixed(1)}%`;
-    }
-  } catch(e) {}
+}
 
-  // Добавляем предупреждение о низкой интенсивности в информацию о сигнале
+function updateSignalInfo() {
+  const si = document.getElementById('signalInfo');
+  if (!si) return;
+  si.textContent = composeSignalInfoText();
+  // Preserve existing behavior: append low-intensity warning tag if applicable
   if (maxIntensity > 0 && maxIntensity < ABSOLUTE_FLOOR * 2) {
-    signalInfoEl.textContent += " ⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ!";
+    si.textContent += " ⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ!";
   }
 }
 
 /* ===== Истории ===== */
-function loadEnergyHistory(){try{const r=localStorage.getItem(ENERGY_HISTORY_KEY); return r?JSON.parse(r):[]}catch{return[]}}
-function saveEnergyHistory(a){try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.stringify(a))}catch{}}
-function addEnergyHistoryEntry(e){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h);}
-function loadEnergyHistoryMain(){try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[]}catch{return[]}}
-function saveEnergyHistoryMain(a){try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a))}catch{}}
+function loadEnergyHistory(){
+  try{const r=localStorage.getItem(ENERGY_HISTORY_KEY); return r?JSON.parse(r):[];}
+  catch(e){return [];}
+}
+function saveEnergyHistory(a){
+  try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.stringify(a));}
+  catch(e){}
+}
+function addEnergyHistoryEntry(e){
+  const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h);
+}
+function loadEnergyHistoryMain(){
+  try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[];}
+  catch(e){return [];}
+}
+function saveEnergyHistoryMain(a){
+  try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a));}
+  catch(e){}
+}
 function _downsampleSeries(arr, maxPts){
   const N = arr.length; if(N<=maxPts) return arr.slice();
   const out=[]; for(let i=0;i<maxPts;i++){ const idx=Math.round(i*(N-1)/(maxPts-1)); out.push(arr[idx]); }
@@ -414,13 +486,7 @@ function drawEnergyHistory(){
   hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
   if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?tr('statusHistEmptyMain'):tr('statusHistEmptyNorm'),20,30);return;}
   const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
-  // Соберем дополнительные слои: полилинии и точки отсечения (для MAIN с самонормированием)
-  const hasExtras = isMain && data.some(d => d && (d.series || typeof d.cut==='number'));
-
   const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
-
-  // === ФОНОВАЯ ЗАЛИВКА ЗОН ДЛЯ САМОНОРМИРОВАНИЯ (0–0.5 красный, 0.5–0.8 жёлтый, 0.8–1.0 зелёный) ===
-  // Рисуем ПОД сеткой/осями и только в основном режиме при пустой истории нормирования
   try {
     if (isMain && !getNormalizationReference()) {
       const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -432,47 +498,32 @@ function drawEnergyHistory(){
       const y05  = yFromVal(0.5);
       const y08  = yFromVal(0.8);
       const y10  = yFromVal(1.0);
-
-      // Красная зона: 0..0.5
       hctx.fillStyle = 'rgba(255, 0, 0, 0.08)';
       hctx.fillRect(leftPad, Math.min(y0, y05), W, Math.abs(y05 - y0));
-
-      // Жёлтая зона: 0.5..0.8
       hctx.fillStyle = 'rgba(255, 215, 0, 0.10)';
       hctx.fillRect(leftPad, Math.min(y05, y08), W, Math.abs(y08 - y05));
-
-      // Зелёная зона: 0.8..1.0
       hctx.fillStyle = 'rgba(0, 128, 0, 0.10)';
       hctx.fillRect(leftPad, Math.min(y08, y10), W, Math.abs(y10 - y08));
     }
-  } catch(e) { /* no-op */ }
-
+  } catch(e) { }
   hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
   for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
   hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
   hctx.fillStyle='#000';hctx.font='12px Arial';hctx.fillText(tr('histX'),leftPad+W/2-60,topPad+H+22);hctx.save();hctx.rotate(-Math.PI/2);hctx.fillText(isMain?tr('histYNorm'):tr('histYAbs'),-topPad-H/2-80,15);hctx.restore();
   hctx.beginPath(); const N=data.length; for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); if(i===0)hctx.moveTo(x,y); else hctx.lineTo(x,y);} hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green'); hctx.lineWidth=2; hctx.stroke();
-  // Отображаем только точки отсечения; полилинии истории не рисуем
   if (isMain) {
-    // Сначала рисуем красную ломаную линию для точек отсечения
     hctx.beginPath();
     for (let i=0;i<N;i++){
       const rec = data[i]||{};
       if (typeof rec.cut==='number'){
         const x = leftPad + (W*(i/Math.max(1,N-1)));
         const y = topPad + H - (H*((rec.cut/100)/maxV));
-        if (i === 0) {
-          hctx.moveTo(x, y);
-        } else {
-          hctx.lineTo(x, y);
-        }
+        if (i === 0) hctx.moveTo(x, y); else hctx.lineTo(x, y);
       }
     }
     hctx.strokeStyle = '#ff0066';
     hctx.lineWidth = 1.5;
     hctx.stroke();
-
-    // Затем рисуем сами точки отсечения
     for (let i=0;i<N;i++){
       const rec = data[i]||{};
       if (typeof rec.cut==='number'){
@@ -487,12 +538,18 @@ function drawEnergyHistory(){
   hctx.fillStyle='#111';hctx.font='10px Arial';const step=Math.ceil(N/8); for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
 }
 
-/* ===== Сброс последнего (с автоповтором) ===== */
+/* ===== Сброс последнего ===== */
 function removeLastHistoryEntry(){
   const mode=getMode();
   if(mode==='main'){const h=loadEnergyHistoryMain(); if(!h.length){setStatus(tr('statusHistEmptyMain'),'warn');return;} h.pop(); saveEnergyHistoryMain(h); setStatus(tr('statusHistDelMain'),'ok');}
   else{const h=loadEnergyHistory(); if(!h.length){setStatus(tr('statusHistEmptyNorm'),'warn');return;} h.pop(); saveEnergyHistory(h); setStatus(tr('statusHistDelNorm'),'ok');}
   drawEnergyHistory();
+  // Ensure modal is English at startup:
+  try{
+    const tt=document.getElementById('techTitle'); if(tt) tt.textContent='Technical settings';
+    const bc=document.getElementById('btnCloseTech'); if(bc) bc.textContent='Close';
+    const ti=document.getElementById('thresholdInfo'); if(ti && (ti.textContent.trim()===''||ti.textContent.includes('—'))) ti.textContent='Current threshold: —';
+  }catch(e){}
 }
 if(btnResetLast) btnResetLast.addEventListener('click',removeLastHistoryEntry);
 let _resetHoldTimer=null, _resetRepeatTimer=null; const _initialDelayMs=600, _repeatEveryMs=250;
@@ -504,8 +561,6 @@ if(btnResetLast){ btnResetLast.addEventListener('mousedown',e=>{ if(e.button===0
 function mapValToY(val,minV,maxV){const h=canvas.height,p=(val-minV)/(maxV-minV||1);return(h-1)-p*(h-1);}
 function drawGraph(intensityValues,secondSeries,isNorm=false){
   ctx.clearRect(0,0,canvas.width,canvas.height);
-
-  // сек. сетка по X
   try{
     const totalTime = Math.max((typeof lastT!=='undefined' && typeof t0!=='undefined') ? (lastT - t0) : 0, 0);
     if (totalTime > 0.001){
@@ -525,49 +580,29 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
       ctx.textAlign = 'left';
     }
   }catch(e){}
-
-  // шкалы
   let maxI=Math.max(...intensityValues)||1, maxS=Math.max(...secondSeries)||1;
   const maxIfs=maxI*1.05, maxSfs=maxS*1.1;
-
-  // горизонтальная сетка по интенсивности
   ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid');
   for(let i=0;i<=5;i++){const y=mapValToY(maxIfs*i/5,0,maxIfs);ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(canvas.width,y);ctx.stroke();}
-
-  // оси
   ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--axes');ctx.beginPath();ctx.moveTo(0,canvas.height-1);ctx.lineTo(canvas.width,canvas.height-1);ctx.moveTo(0,0);ctx.lineTo(0,canvas.height);ctx.stroke();
-
-  // подписи левой оси (интенсивность)
   ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--text');ctx.font='12px Arial';ctx.textAlign='left';
   for(let i=0;i<=5;i++){const v=maxIfs*i/5,y=mapValToY(v,0,maxIfs);ctx.fillText(v.toExponential(2),5,y-3);}
   ctx.save();ctx.rotate(-Math.PI/2);ctx.fillText(tr('yLeft'),-canvas.height+10,14);ctx.restore();
-
-  // подписи правой оси (энергия / нормированная)
   ctx.textAlign='right';
   for(let i=0;i<=5;i++){const v=maxSfs*i/5,y=mapValToY(v,0,maxSfs);ctx.fillText(isNorm?v.toFixed(2):v.toExponential(2),canvas.width-5,y-3);}
   ctx.save();ctx.rotate(Math.PI/2);ctx.fillText(isNorm?tr('yRightNorm'):tr('yRightRaw'),canvas.height/2-60,canvas.width-10);ctx.restore();
-
-  // интенсивность
   ctx.beginPath(); for(let i=0;i<intensityValues.length;i++){const x=(i/Math.max(intensityValues.length-1,1))*canvas.width;const y=mapValToY(intensityValues[i],0,maxIfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--blue');ctx.lineWidth=2;ctx.stroke();
-
-  // вторая кривая
   ctx.beginPath(); for(let i=0;i<secondSeries.length;i++){const x=(i/Math.max(secondSeries.length-1,1))*canvas.width;const y=mapValToY(secondSeries[i],0,maxSfs);if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);} ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green');ctx.lineWidth=2;ctx.stroke();
-
-  // горизонтальная направляющая по последнему значению
   if (secondSeries.length>1){
     const last = secondSeries[secondSeries.length-1];
     const y = mapValToY(last, 0, maxSfs);
     ctx.beginPath(); ctx.setLineDash([5,3]); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y);
     ctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--green-dark'); ctx.lineWidth=1; ctx.stroke(); ctx.setLineDash([]);
   }
-
-  // Рисуем маркеры начала и конца сигнала с улучшенной видимостью
   if (signalStartTime !== null) {
     const totalTime = lastT - t0;
     if (totalTime > 0) {
       const xStart = (signalStartTime / totalTime) * canvas.width;
-      
-      // Улучшенная видимость маркера начала
       ctx.beginPath();
       ctx.setLineDash([5, 3]);
       ctx.moveTo(xStart, 0);
@@ -579,15 +614,11 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.shadowBlur = 0;
-      
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00';
       ctx.font = 'bold 12px Arial';
       ctx.fillText('Начало', xStart + 5, 15);
     }
   }
-  
-
-  // Вертикаль отсечения в момент (Начало + 1 сек) при самонормировании по единице
   try {
     const mode = getMode();
     const refNow = getNormalizationReference();
@@ -609,13 +640,10 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
       }
     }
   } catch(e) {}
-
   if (signalEndTime !== null) {
     const totalTime = lastT - t0;
     if (totalTime > 0) {
       const xEnd = (signalEndTime / totalTime) * canvas.width;
-      
-      // Улучшенная видимость маркера конца
       ctx.beginPath();
       ctx.setLineDash([5, 3]);
       ctx.moveTo(xEnd, 0);
@@ -627,14 +655,11 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.shadowBlur = 0;
-      
       ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066';
       ctx.font = 'bold 12px Arial';
       ctx.fillText('Конец', xEnd + 5, 30);
     }
   }
-  
-  // Рисуем линию порога для наглядности
   if (currentThreshold > 0) {
     const yThreshold = mapValToY(currentThreshold, 0, maxIfs);
     ctx.beginPath();
@@ -645,7 +670,6 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
     ctx.lineWidth = 1;
     ctx.stroke();
     ctx.setLineDash([]);
-    
     ctx.fillStyle = '#666';
     ctx.font = '10px Arial';
     ctx.fillText(`Порог: ${currentThreshold.toExponential(2)}`, 10, yThreshold - 5);
@@ -672,30 +696,19 @@ function tick(){
   const t=audioCtx.currentTime, dt=Math.max(0,t-lastT); lastT=t;
   const relTime = t - t0;
   sampleTimes.push(relTime);
-
   const last=(integralValues.length?integralValues[integralValues.length-1]:0);
   const next=last+intensity*dt;
   intensityValues.push(intensity); integralValues.push(next);
-
-  // Проверяем автостоп
-  if (checkAutoStop(t)) {
-    return;
-  }
-
-  // Определяем начало и конец сигнала
+  if (checkAutoStop(t)) { return; }
   const signalEvent = detectSignal(intensity, next, t);
   if (signalEvent === 'start') {
-    // Устанавливаем момент отсечения: Начало + 1 сек
     cutTimeAbs = signalStartTime + 1.0;
-    cutPointPercent = null; // пока неизвестно
-
+    cutPointPercent = null;
     setStatus('🔊 Обнаружено начало сигнала', 'ok');
   } else if (signalEvent === 'end') {
     setStatus('🔇 Обнаружен конец сигнала', 'ok');
   }
-  
   updateSignalInfo();
-
   const mode=getMode();
   if(mode==='normalization'){
     drawGraph(intensityValues, integralValues, false);
@@ -705,19 +718,14 @@ function tick(){
       const norm=integralValues.map(v=>v/ref);
       drawGraph(intensityValues, norm, true);
     }else{
-      // fallback: самонормирование текущей кривой (асимптота → 1)
       const lastNow = integralValues.length ? integralValues[integralValues.length-1] : 1;
       const norm=integralValues.map(v=>v/(lastNow||1));
-
-      // Вычисляем точку отсечения и процент, если возможно
       if (cutTimeAbs !== null && sampleTimes.length>0) {
-        // ищем индекс
         let idx = sampleTimes.findIndex(tt => tt >= cutTimeAbs);
-        if (idx === -1) idx = sampleTimes.length - 1; // если не накопили 1с после начала
+        if (idx === -1) idx = sampleTimes.length - 1;
         const val = norm[Math.max(0, idx)] || 0;
         cutPointPercent = Math.max(0, Math.min(100, val*100));
       }
-
       drawGraph(intensityValues, norm, true);
     }
   }
@@ -726,17 +734,11 @@ function tick(){
 
 function stopRecordingAndFinalize(){
   recording=false; 
-  if(rafId) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
-  
-  // Если сигнал активен, но не был определен конец, устанавливаем конец как последнюю точку
+  if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
   if (isSignalActive && signalStartTime !== null && signalEndTime === null) {
     signalEndTime = lastT - t0;
     updateSignalInfo();
   }
-  
   const mode=getMode();
   if(mode==='normalization'){
     const last=integralValues.length?integralValues[integralValues.length-1]:0;
@@ -746,9 +748,7 @@ function stopRecordingAndFinalize(){
     const ref=getNormalizationReference();
     const last=integralValues.length?integralValues[integralValues.length-1]:0;
     const norm=ref ? (last/ref) : 1;
-
     if (!ref) {
-      // самонормирование: сохраняем также точку отсечения и полилинию
       const lastNow = last||1;
       const normSeries = integralValues.map(v=>v/(lastNow||1));
       const ds = _downsampleSeries(normSeries, 200);
@@ -766,7 +766,6 @@ function stopRecordingAndFinalize(){
     } else {
       addEnergyHistoryEntryMain(norm);
     }
-
     setStatus(tr('statusMainDone'),'ok');
   }
   drawEnergyHistory();
@@ -783,10 +782,7 @@ function resetRecording(){
   lastIntegralValue = 0;
   stableCount = 0;
   currentThreshold = 0;
-  if(rafId) {
-    cancelAnimationFrame(rafId);
-    rafId = null;
-  }
+  if(rafId) { cancelAnimationFrame(rafId); rafId = null; }
   updateSignalInfo();
   setThresholdInfo(tr('thresholdInfo'));
   ctx.clearRect(0,0,canvas.width,canvas.height);
@@ -809,7 +805,19 @@ function init(){
   if(btnReset) btnReset.addEventListener('click',resetRecording);
   if(btnStartNorm) btnStartNorm.addEventListener('click',()=>setMode('normalization'));
   if(btnFinishNorm) btnFinishNorm.addEventListener('click',()=>setMode('main'));
+  if(btnTech) btnTech.addEventListener('click', openTech);
+  if(btnCloseTech) btnCloseTech.addEventListener('click', closeTech);
+  if(techModal){
+    techModal.addEventListener('click', closeTech);
+    window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeTech(); });
+  }
   drawEnergyHistory();
+  // Ensure modal is English at startup:
+  try{
+    const tt=document.getElementById('techTitle'); if(tt) tt.textContent='Technical settings';
+    const bc=document.getElementById('btnCloseTech'); if(bc) bc.textContent='Close';
+    const ti=document.getElementById('thresholdInfo'); if(ti && (ti.textContent.trim()===''||ti.textContent.includes('—'))) ti.textContent='Current threshold: —';
+  }catch(e){}
 }
 window.addEventListener('load',init);
 </script>
