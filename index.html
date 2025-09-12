@@ -432,7 +432,7 @@ function loadEnergyHistoryMain(){ try{const r=localStorage.getItem(ENERGY_HISTOR
 function saveEnergyHistoryMain(a){ try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a));}catch(e){} }
 function _downsampleSeries(arr, maxPts){ const N = arr.length; if(N<=maxPts) return arr.slice(); const out=[]; for(let i=0;i<maxPts;i++){ const idx=Math.round(i*(N-1)/(maxPts-1)); out.push(arr[idx]); } return out; }
 function addEnergyHistoryEntryMain(n){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h);}
-function getNormalizationReference(){const h=loadEnergyHistory(); if(!h.length)return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
+function getNormalizationReference(){const h=loadEnergyHistory(); if(h.length < 2) return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
 
 function drawEnergyHistory(){
   const mode=getMode(), isMain=(mode==='main');
