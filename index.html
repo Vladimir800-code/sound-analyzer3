@@ -730,5 +730,159 @@ function init(){
 }
 window.addEventListener('load',init);
 </script>
+<script>
+/* ===== Robust HTML-only export =====
+   - Grabs histories from the live page (functions OR localStorage fallback)
+   - Embeds data directly into the saved report (no dependency on localStorage)
+   - Energy chart auto-clips by P95; table uses scientific notation
+*/
+(function(){
+  function percentile(a,p){a=a.slice().filter(v=>isFinite(v)).sort((x,y)=>x-y);if(!a.length)return 0;const i=(p/100)*(a.length-1);const lo=Math.floor(i),hi=Math.ceil(i);if(lo===hi)return a[lo];const w=i-lo;return a[lo]*(1-w)+a[hi]*w;}
+  function niceNum(r,round){const e=Math.floor(Math.log10(r||1)),f=(r/Math.pow(10,e))||1;let nf;if(round){if(f<1.5)nf=1;else if(f<3)nf=2;else if(f<7)nf=5;else nf=10;}else{if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=5)nf=5;else nf=10;}return nf*Math.pow(10,e);}
+  function niceAxis(a,b,n){if(a===b){b=a+1;}const rg=niceNum(b-a,false),st=niceNum(rg/(n-1),true),g0=Math.floor(a/st)*st,g1=Math.ceil(b/st)*st;const t=[];for(let v=g0;v<=g1+0.5*st;v+=st)t.push(v);return{min:g0,max:g1,step:st,ticks:t};}
+  function fmtSci(v){ if(!isFinite(v)||v===0) return String(v); const e=Number(v).toExponential(3); return e.replace('e','×10^'); }
+
+  function tryParseJSON(s){ try{ return JSON.parse(s);}catch(_){ return null; } }
+
+  function collectFromLocalStorage(){
+    let bestNorm=[], bestMain=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      const val = tryParseJSON(localStorage.getItem(k));
+      if(Array.isArray(val) && val.length){
+        const sample = val[0]||{};
+        if('energy' in sample){ if(val.length>bestNorm.length) bestNorm = val; }
+        if('norm' in sample || 'normalized' in sample){ if(val.length>bestMain.length) bestMain = val; }
+      }
+    }
+    // normalize field names
+    bestMain = bestMain.map(r=>({ts:r.ts||r.time||r.date||new Date().toISOString(), norm:('norm' in r)?r.norm:(r.normalized||null), cut:r.cut}));
+    bestNorm = bestNorm.map(r=>({ts:r.ts||r.time||r.date||new Date().toISOString(), energy:r.energy}));
+    return {normHist:bestNorm, mainHist:bestMain};
+  }
+
+  function collectHistories(){
+    // 1) Prefer supplied functions, if exist
+    let normHist = [], mainHist = [];
+    try{ if(typeof loadEnergyHistory==='function'){ normHist = loadEnergyHistory() || []; } }catch(_){}
+    try{ if(typeof loadEnergyHistoryMain==='function'){ mainHist = loadEnergyHistoryMain() || []; } }catch(_){}
+    // 2) Fallback: scan localStorage
+    if(!(normHist && normHist.length) || !(mainHist && mainHist.length)){
+      const r = collectFromLocalStorage();
+      if(!normHist.length) normHist = r.normHist;
+      if(!mainHist.length) mainHist = r.mainHist;
+    }
+    return {normHist, mainHist};
+  }
+
+  function exportHTMLReport(){
+    const {normHist, mainHist} = collectHistories();
+    const norm = JSON.stringify(normHist).replace(/</g,'\\u003C');
+    const main = JSON.stringify(mainHist).replace(/</g,'\\u003C');
+
+    const parts = [];
+    parts.push('<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Acoustic Share Report</title>');
+    parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
+    parts.push('<style>body{font-family:Arial,sans-serif;margin:20px;}h1{font-size:20px;margin:0 0 6px 0;}h2{font-size:16px;margin:14px 0 6px 0;}canvas{border:1px solid #ddd;border-radius:6px;width:100%;height:260px;}table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #ccc;padding:6px 8px;}th{background:#f5f5f5;}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}.legend{display:flex;gap:14px;align-items:center;margin:6px 0 2px 0;font-size:12px;color:#333}.chip{width:12px;height:12px;border-radius:2px;display:inline-block;border:1px solid #999}.c-energy{background:#cfe8ff;border-color:#6aa0ff}.c-norm{background:#d7f5e3;border-color:#42a362}.c-cut{background:#ffd7e8;border-color:#ff66a3}.bg-red{background:rgba(255,0,0,0.08)}.bg-yellow{background:rgba(255,215,0,0.10)}.bg-green{background:rgba(0,128,0,0.10)}.card{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0;}</style>');
+    parts.push('</head><body>');
+    parts.push('<h1>Акустический спироанализатор — отчёт</h1>');
+    parts.push('<div>Дата формирования: ' + new Date().toLocaleString() + '</div>');
+
+    parts.push('<div class="card"><h2>История нормирования</h2>');
+    parts.push('<div class="legend"><span class="chip c-energy"></span> Интегральная энергия</div>');
+    parts.push('<div class="grid"><canvas id="cnNorm" width="800" height="260"></canvas>');
+    parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Energy (sci)</th></tr></thead><tbody id="tbNorm"></tbody></table></div></div></div>');
+
+    parts.push('<div class="card"><h2>История основного режима</h2>');
+    parts.push('<div class="legend"><span class="chip c-norm"></span> Нормированная асимптота <span class="chip c-cut"></span> Точка отсечения</div>');
+    parts.push('<div class="grid"><canvas id="cnMain" width="800" height="260"></canvas>');
+    parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Norm</th><th>Cut, %</th></tr></thead><tbody id="tbMain"></tbody></table></div></div></div>');
+
+    parts.push('<script>');
+    parts.push('const dataNorm = ' + norm + '; const dataMain = ' + main + ';');
+    parts.push(`
+// Utilities inside report
+function percentile(a,p){a=a.slice().filter(v=>isFinite(v)).sort((x,y)=>x-y);if(!a.length)return 0;const i=(p/100)*(a.length-1);const lo=Math.floor(i),hi=Math.ceil(i);if(lo===hi)return a[lo];const w=i-lo;return a[lo]*(1-w)+a[hi]*w;}
+function niceNum(r,round){const e=Math.floor(Math.log10(r||1)),f=(r/Math.pow(10,e))||1;let nf;if(round){if(f<1.5)nf=1;else if(f<3)nf=2;else if(f<7)nf=5;else nf=10;}else{if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=5)nf=5;else nf=10;}return nf*Math.pow(10,e);}
+function niceAxis(a,b,n){if(a===b){b=a+1;}const rg=niceNum(b-a,false),st=niceNum(rg/(n-1),true),g0=Math.floor(a/st)*st,g1=Math.ceil(b/st)*st;const t=[];for(let v=g0;v<=g1+0.5*st;v+=st)t.push(v);return{min:g0,max:g1,step:st,ticks:t};}
+function drawHistory(canvasId, rows, isMain){
+  const c = document.getElementById(canvasId), x = c.getContext('2d');
+  const left=50, right=20, top=12, bottom=28, W=c.width-left-right, H=c.height-top-bottom;
+  x.clearRect(0,0,c.width,c.height);
+  if(!rows || !rows.length){ x.fillStyle='#555'; x.font='14px Arial'; x.fillText('Нет данных',20,30); return; }
+  const vals = rows.map(r=> isMain ? (+r.norm||0) : (+r.energy||0) );
+  const maxCandidate = isMain ? Math.max.apply(null, vals.concat([1])) : Math.max(percentile(vals,95), 1e-12);
+  const ax = niceAxis(0, maxCandidate, 6);
+  // Grid + axes
+  x.strokeStyle='#e9e9e9'; x.lineWidth=1;
+  ax.ticks.forEach(v=>{const y=top+H-(H*((v-ax.min)/(ax.max-ax.min||1)));x.beginPath();x.moveTo(left,y);x.lineTo(left+W,y);x.stroke();});
+  x.strokeStyle='#000'; x.beginPath(); x.moveTo(left,top); x.lineTo(left,top+H); x.lineTo(left+W,top+H); x.stroke();
+  // Y labels
+  x.fillStyle='#111'; x.font='11px Arial';
+  ax.ticks.forEach(v=>{ const y=top+H-(H*((v-ax.min)/(ax.max-ax.min||1))); const lab=isMain?v.toFixed(2):(v===0?'0':Number(v).toExponential(2)); x.fillText(lab,6,y-2); });
+  // Bands for main
+  if (isMain){
+    const yFromVal=(val)=> top+H-(H*((val-ax.min)/(ax.max-ax.min||1)));
+    const y0=yFromVal(0), y05=yFromVal(0.5), y08=yFromVal(0.8), y10=yFromVal(1.0);
+    x.fillStyle='rgba(255,0,0,0.08)';   x.fillRect(left, Math.min(y0,y05), W, Math.abs(y05-y0));
+    x.fillStyle='rgba(255,215,0,0.10)'; x.fillRect(left, Math.min(y05,y08), W, Math.abs(y08-y05));
+    x.fillStyle='rgba(0,128,0,0.10)';   x.fillRect(left, Math.min(y08,y10), W, Math.abs(y10-y08));
+  }
+  // X labels
+  x.fillStyle='#111'; x.font='10px Arial'; const N=rows.length, step=Math.ceil(N/8);
+  for(let i=0;i<N;i++){ const xv=left+(W*(i/Math.max(1,N-1))); if(i%step===0||i===N-1){ const d=new Date(rows[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); x.fillText(lab, xv-32, top+H+14); } }
+  // Series
+  x.beginPath();
+  for(let i=0;i<N;i++){ const xv=left+(W*(i/Math.max(1,N-1))); const yv=top+H-(H*((vals[i]-ax.min)/(ax.max-ax.min||1))); if(i===0) x.moveTo(xv,yv); else x.lineTo(xv,yv); }
+  x.strokeStyle=isMain?'#1aab55':'#2f6fed'; x.lineWidth=2; x.stroke();
+  // Cut series for main
+  if(isMain){
+    x.beginPath(); let any=false;
+    for(let i=0;i<N;i++){ const rec=rows[i]||{}; if(typeof rec.cut==='number'){ any=true; const xv=left+(W*(i/Math.max(1,N-1))); const yv=top+H-(H*(( (rec.cut/100)-ax.min)/(ax.max-ax.min||1))); if(!any) x.moveTo(xv,yv); else x.lineTo(xv,yv);} }
+    if(any){ x.strokeStyle='#ff0066'; x.lineWidth=1.5; x.stroke(); }
+    for(let i=0;i<N;i++){ const rec=rows[i]||{}; if(typeof rec.cut==='number'){ const xv=left+(W*(i/Math.max(1,N-1))); const yv=top+H-(H*(( (rec.cut/100)-ax.min)/(ax.max-ax.min||1))); x.beginPath(); x.arc(xv,yv,3.5,0,Math.PI*2); x.fillStyle='#ff0066'; x.fill(); } }
+  }
+}
+function fillTableNorm(tid, rows){
+  const tb=document.getElementById(tid); tb.innerHTML='';
+  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const ts = new Date(r.ts).toLocaleString(); const en = (r.energy!=null)?((Number(r.energy)===0)?'0':Number(r.energy).toExponential(3).replace('e','×10^')):''; [i+1, ts, en].forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
+}
+function fillTableMain(tid, rows){
+  const tb=document.getElementById(tid); tb.innerHTML='';
+  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const cells=[i+1, new Date(r.ts).toLocaleString(), (r.norm!=null)?Number(r.norm).toFixed(3):'', (r.cut!=null)?(Number(r.cut).toFixed(1)):'']; cells.forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
+}
+(function(){
+  const normRows = dataNorm, mainRows = dataMain;
+  drawHistory('cnNorm', normRows, false);
+  fillTableNorm('tbNorm', normRows);
+  drawHistory('cnMain', mainRows, true);
+  fillTableMain('tbMain', mainRows);
+})();`);
+    parts.push('<\/script>');
+    parts.push('</body></html>');
+
+    const blob = new Blob([parts.join("")], {type:'text/html;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url;
+    const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+    a.download = 'acoustic_share_'+stamp+'.html';
+    document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+  }
+
+  function ensureShareButton(){
+    const target = document.getElementById('btnTech')?.parentElement || document.querySelector('.toolbar') || document.body;
+    const btn = document.createElement('button');
+    btn.id = 'btnShare';
+    btn.className = 'button';
+    btn.textContent = 'Поделиться';
+    btn.addEventListener('click', exportHTMLReport);
+    target.appendChild(btn);
+  }
+  if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', ensureShareButton); }
+  else { ensureShareButton(); }
+})();
+
+</script>
 </body>
 </html>
