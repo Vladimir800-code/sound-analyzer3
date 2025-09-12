@@ -130,8 +130,16 @@
         </div>
         <div style="font-size:12px; color:#666; margin-top:6px;">Applies instantly and is saved locally.</div>
       </div>
+      <div style="margin-top:14px; font-size:14px;">
+        <label for="stabSlider" style="display:block; margin-bottom:6px; font-weight:600;">Stability criterion, %</label>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input id="stabSlider" type="range" min="0" max="5" step="0.25" value="1" style="flex:1;">
+          <span id="stabValue" style="min-width:56px; text-align:right;">1.00%</span>
+        </div>
+        <div style="font-size:12px; color:#666; margin-top:6px;">Lower = более чувствительно к завершению, Higher = более строгое завершение.</div>
+      </div>
       <div style="font-size:12px;color:#666;margin-top:8px;">
-        * Threshold is computed as the maximum of 5% of the current max intensity and an absolute floor.
+        * Threshold is computed as the maximum of the chosen percent of the current max intensity and an absolute floor.
       </div>
     </div>
     <div class="modal-actions">
@@ -153,7 +161,7 @@ function currLang(){ return localStorage.getItem(LANG_KEY)||'ru'; }
 const translations={
   ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",startLabel:"Начало",endLabel:"Конец",durationLabel:"Длительность",cutLabel:"Точка отсечения",secUnit:"с"},
   en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s",startLabel:"Start",endLabel:"End",durationLabel:"Duration",cutLabel:"Cutoff point",secUnit:"s"},
-  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",startLabel:"התחלה",endLabel:"סוף",durationLabel:"משך",cutLabel:"נקודת חיתוך",secUnit:"ש"}
+  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופפון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",startLabel:"התחלה",endLabel:"סוף",durationLabel:"משך",cutLabel:"נקודת חיתוך",secUnit:"ש"}
 };
 function tr(key){ try{ return (translations[currLang()]||translations.ru)[key] || key; }catch(e){ return key; } }
 function setStatus(msg, level='ok'){ const el=document.getElementById('status'); el.className='status '+(level||'ok'); el.textContent=msg; }
@@ -230,8 +238,23 @@ function getRelativeThresholdFraction(){
   return getThresholdPct() / 100;
 }
 
+/* Stability slider persistence */
+const STABILITY_PCT_KEY = 'stability_pct_v1';
+function getStabilityPct(){
+  let v = parseFloat(localStorage.getItem(STABILITY_PCT_KEY));
+  if (!(v>=0 && v<=5)) v = 1;
+  return v;
+}
+function setStabilityPct(v){
+  v = Math.max(0, Math.min(5, Number(v)||0));
+  localStorage.setItem(STABILITY_PCT_KEY, String(v));
+}
+function getStabilityCriterion(){
+  return getStabilityPct() / 100;
+}
+
 const ABSOLUTE_FLOOR = 0.001;
-const INTEGRAL_STABILITY_THRESHOLD = 0.01;
+// const INTEGRAL_STABILITY_THRESHOLD = 0.01; // replaced by getStabilityCriterion()
 const STABLE_SAMPLES_REQUIRED = 10;
 const AUTO_STOP_AFTER_END = 3.0;
 const MAX_RECORDING_TIME = 30.0;
@@ -257,7 +280,7 @@ function hideLowIntensityWarning() {
 
 /* Modal helpers */
 function openTech(){ 
-  techModal.style.display='block';
+  techModal.style.display='block'; 
   try{
     const rel = Math.max(maxIntensity * getRelativeThresholdFraction(), ABSOLUTE_FLOOR);
     setThresholdInfo(`Current threshold: ${rel.toExponential(2)} (${getThresholdPct().toFixed(1)}% of max ${maxIntensity>0?maxIntensity.toExponential(2):'—'})`);
@@ -268,11 +291,18 @@ function openTech(){
       slider.value = String(pct);
       out.textContent = pct.toFixed(1) + '%';
     }
+    const s2 = document.getElementById('stabSlider');
+    const o2 = document.getElementById('stabValue');
+    if (s2 && o2){
+      const pct2 = getStabilityPct();
+      s2.value = String(pct2);
+      o2.textContent = pct2.toFixed(2) + '%';
+    }
   }catch(e){}
 }
 function closeTech(){ techModal.style.display='none'; }
 
-/* AutoStop */
+/* AutoStop & decorations */
 function checkAutoStop(currentTime) {
   const elapsedTime = currentTime - t0;
   if (elapsedTime >= MAX_RECORDING_TIME) {
@@ -337,7 +367,7 @@ function detectSignal(intensity, currentIntegral, currentTime) {
   }
   if (isSignalActive && currentIntegral > 0) {
     const relativeChange = Math.abs((currentIntegral - lastIntegralValue) / currentIntegral);
-    if (relativeChange <= INTEGRAL_STABILITY_THRESHOLD) {
+    if (relativeChange <= getStabilityCriterion()) {
       stableCount++;
       if (stableCount >= STABLE_SAMPLES_REQUIRED && signalEndTime === null) {
         isSignalActive = false;
@@ -640,6 +670,10 @@ function initI18n(){
 }
 function init(){
   initI18n(); applyMode();
+  const slider = document.getElementById('thrSlider');
+  const out = document.getElementById('thrValue');
+  const s2 = document.getElementById('stabSlider');
+  const o2 = document.getElementById('stabValue');
   if(btnRequestMic) btnRequestMic.addEventListener('click',requestMicrophoneAccess);
   if(btnStart) btnStart.addEventListener('click',()=>{
     if(!analyser){ setStatus('Сначала разрешите микрофон.','error'); return; }
@@ -653,15 +687,13 @@ function init(){
   if(btnStartNorm) btnStartNorm.addEventListener('click',()=>setMode('normalization'));
   if(btnFinishNorm) btnFinishNorm.addEventListener('click',()=>setMode('main'));
   if(btnTech) btnTech.addEventListener('click', openTech);
-  if(btnCloseTech) btnCloseTech.addEventListener('click', closeTech);
+  if(btnCloseTech) btnCloseTech.addEventListener('click', ()=>{ closeTech(); });
   if(techModal){
     techModal.addEventListener('click', closeTech);
     window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeTech(); });
   }
   // Initialize threshold slider (technical modal)
   try{
-    const slider = document.getElementById('thrSlider');
-    const out = document.getElementById('thrValue');
     if (slider && out){
       const pct = getThresholdPct();
       slider.value = String(pct);
@@ -675,6 +707,19 @@ function init(){
       });
     }
   }catch(e){}
+  // Initialize stability slider (technical modal)
+  try{
+    if (s2 && o2){
+      const pct2 = getStabilityPct();
+      s2.value = String(pct2);
+      o2.textContent = pct2.toFixed(2) + '%';
+      s2.addEventListener('input', (e)=>{
+        const v = parseFloat(e.target.value);
+        setStabilityPct(v);
+        o2.textContent = v.toFixed(2) + '%';
+      });
+    }
+  }catch(e){} 
   drawEnergyHistory();
   // Ensure modal is English at startup:
   try{
