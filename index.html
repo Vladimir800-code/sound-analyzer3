@@ -184,6 +184,7 @@ function applyTranslations(lang){
   document.body.dir=(lang==='he')?'rtl':'ltr';
   localStorage.setItem(LANG_KEY,lang);
   try{ updateSignalInfo(); }catch(e){}
+  try{ const sb=document.getElementById('btnShare'); if(sb){ sb.textContent=(lang==='en'?'Share':(lang==='he'?'שתף':'Поделиться')); } }catch(e){}
   try { modeBadge.textContent = (getMode()==='normalization') ? tr('modeBadgeNorm') : tr('modeBadgeMain'); } catch(e){}
   try { drawEnergyHistory(); } catch(e){}
   try{ setStatus(t.ready,'ok'); }catch(e){}
@@ -274,7 +275,7 @@ function showLowIntensityWarning() {
 }
 function hideLowIntensityWarning() {
   lowIntensityWarningActive = false;
-  lowIntensityWarning.style.display = 'none';
+    lowIntensityWarning.style.display = 'none';
   if (warningTimeout) { clearTimeout(warningTimeout); warningTimeout = null; }
 }
 
@@ -425,14 +426,56 @@ function updateSignalInfo() {
 }
 
 /* History */
-function loadEnergyHistory(){ try{const r=localStorage.getItem(ENERGY_HISTORY_KEY); return r?JSON.parse(r):[];}catch(e){return [];} }
-function saveEnergyHistory(a){ try{localStorage.setItem(ENERGY_HISTORY_KEY,JSON.stringify(a));}catch(e){} }
-function addEnergyHistoryEntry(e){ const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistory(); h.push({ts:d.toISOString(),energy:Number(e)||0}); saveEnergyHistory(h); }
-function loadEnergyHistoryMain(){ try{const r=localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); return r?JSON.parse(r):[];}catch(e){return [];} }
-function saveEnergyHistoryMain(a){ try{localStorage.setItem(ENERGY_HISTORY_MAIN_KEY,JSON.stringify(a));}catch(e){} }
+function loadEnergyHistory(){ 
+  try{
+    const r = localStorage.getItem(ENERGY_HISTORY_KEY);
+    const parsed = r ? JSON.parse(r) : [];
+    // Добавляем нулевую точку в начало, если её нет
+    if (parsed.length === 0 || parsed[0].energy !== 0) {
+      const zeroPoint = {ts: new Date(0).toISOString(), energy: 0};
+      return [zeroPoint, ...parsed];
+    }
+    return parsed;
+  } catch(e) {
+    return [{ts: new Date(0).toISOString(), energy: 0}];
+  }
+}
+
+function saveEnergyHistory(a){ 
+  try{
+    // Убеждаемся, что нулевая точка не сохраняется в localStorage
+    const filtered = a.filter(item => item.energy !== 0 || item.ts !== new Date(0).toISOString());
+    localStorage.setItem(ENERGY_HISTORY_KEY, JSON.stringify(filtered));
+  } catch(e){} 
+}
+
+function addEnergyHistoryEntry(e){ 
+  const d = new Date(); 
+  d.setSeconds(0,0); 
+  const h = loadEnergyHistory();
+  // Пропускаем добавление, если пытаемся добавить нулевую точку
+  if (e === 0) return;
+  
+  // Удаляем нулевую точку из начала перед добавлением новой записи
+  const filtered = h.filter(item => item.energy !== 0 || item.ts !== new Date(0).toISOString());
+  filtered.push({ts: d.toISOString(), energy: Number(e) || 0});
+  saveEnergyHistory(filtered);
+}
+
+function loadEnergyHistoryMain(){ try{ const r = localStorage.getItem(ENERGY_HISTORY_MAIN_KEY); const parsed = r ? JSON.parse(r) : []; if (parsed.length === 0 || parsed[0].norm !== 0) {   const zeroPoint = {ts: new Date(0).toISOString(), norm: 0};   return [zeroPoint, ...parsed]; } return parsed;}catch(e){ return [{ts: new Date(0).toISOString(), norm: 0}];} }
+function saveEnergyHistoryMain(a){ try{ const filtered = a.filter(item => item.norm !== 0 || item.ts !== new Date(0).toISOString()); localStorage.setItem(ENERGY_HISTORY_MAIN_KEY, JSON.stringify(filtered));}catch(e){} }
 function _downsampleSeries(arr, maxPts){ const N = arr.length; if(N<=maxPts) return arr.slice(); const out=[]; for(let i=0;i<maxPts;i++){ const idx=Math.round(i*(N-1)/(maxPts-1)); out.push(arr[idx]); } return out; }
-function addEnergyHistoryEntryMain(n){const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); h.push({ts:d.toISOString(),norm:Number(n)||0}); saveEnergyHistoryMain(h);}
-function getNormalizationReference(){const h=loadEnergyHistory(); if(h.length < 2) return null; let m=-Infinity; for(const x of h){const v=Number(x.energy)||0; if(v>m)m=v;} return (isFinite(m)&&m>0)?m:null;}
+function addEnergyHistoryEntryMain(n){ const d=new Date(); d.setSeconds(0,0); const h=loadEnergyHistoryMain(); if (n === 0) return; const filtered = h.filter(item => item.norm !== 0 || item.ts !== new Date(0).toISOString()); filtered.push({ts:d.toISOString(), norm:Number(n)||0}); saveEnergyHistoryMain(filtered);}
+
+function getNormalizationReference(){
+  const h = loadEnergyHistory();
+  // Пропускаем нулевую точку при поиске максимального значения
+  const filtered = h.filter(item => item.energy !== 0 || item.ts !== new Date(0).toISOString());
+  if(filtered.length === 0) return null; 
+  let m = -Infinity; 
+  for(const x of filtered){ const v = Number(x.energy) || 0; if(v > m) m = v; } 
+  return (isFinite(m) && m > 0) ? m : null;
+}
 
 function drawEnergyHistory(){
   const mode=getMode(), isMain=(mode==='main');
@@ -465,15 +508,25 @@ function drawEnergyHistory(){
     hctx.strokeStyle = '#ff0066'; hctx.lineWidth = 1.5; hctx.stroke();
     for (let i=0;i<N;i++){ const rec = data[i]||{}; if (typeof rec.cut==='number'){ const x = leftPad + (W*(i/Math.max(1,N-1))); const y = topPad + H - (H*((rec.cut/100)/maxV)); hctx.beginPath(); hctx.arc(x, y, 4, 0, Math.PI*2); hctx.fillStyle = '#ff0066'; hctx.fill(); } }
   }
-  hctx.fillStyle='#111';hctx.font='10px Arial';const step=Math.ceil(N/8);
+  hctx.fillStyle='#111';hctx.font='10px Arial';const step=1;
   for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
 }
 
 /* Remove last + auto-repeat */
 function removeLastHistoryEntry(){
-  const mode=getMode();
-  if(mode==='main'){const h=loadEnergyHistoryMain(); if(!h.length){setStatus(tr('statusHistEmptyMain'),'warn');return;} h.pop(); saveEnergyHistoryMain(h); setStatus(tr('statusHistDelMain'),'ok');}
-  else{const h=loadEnergyHistory(); if(!h.length){setStatus(tr('statusHistEmptyNorm'),'warn');return;} h.pop(); saveEnergyHistory(h); setStatus(tr('statusHistDelNorm'),'ok');}
+  const mode = getMode();
+  if(mode === 'main'){ const h = loadEnergyHistoryMain(); const filtered = h.filter(item => item.norm !== 0 || item.ts !== new Date(0).toISOString()); if(!filtered.length){ setStatus(tr('statusHistEmptyMain'),'warn'); return; } filtered.pop(); saveEnergyHistoryMain(filtered); setStatus(tr('statusHistDelMain'),'ok'); } else {
+    const h = loadEnergyHistory();
+    // Не удаляем нулевую точку
+    if(h.length <= 1){ setStatus(tr('statusHistEmptyNorm'),'warn'); return; }
+    
+    // Удаляем последнюю запись, но не нулевую точку
+    const filtered = h.filter(item => item.energy !== 0 || item.ts !== new Date(0).toISOString());
+    if(!filtered.length){ setStatus(tr('statusHistEmptyNorm'),'warn'); return; }
+    filtered.pop();
+    saveEnergyHistory(filtered);
+    setStatus(tr('statusHistDelNorm'),'ok');
+  }
   drawEnergyHistory();
 }
 if(btnResetLast) btnResetLast.addEventListener('click',removeLastHistoryEntry);
@@ -869,7 +922,7 @@ function fillTableMain(tid, rows){
     const btn = document.createElement('button');
     btn.id = 'btnShare';
     btn.className = 'button';
-    btn.textContent = 'Поделиться';
+    btn.textContent = (currLang()==='en' ? 'Share' : (currLang()==='he' ? 'שתף' : 'Поделиться'));
     btn.addEventListener('click', exportHTMLReport);
     target.appendChild(btn);
   }
