@@ -417,7 +417,7 @@ function composeSignalInfoText(){
       const mode = getMode();
       if (mode==='main' && !getNormalizationReference() && Array.isArray(cutPointsPercent) && cutPointsPercent.length) {
   const L=val=> (val!=null?Number(val).toFixed(1):'—');
-  const parts=[`25%: ${L(cutPointsPercent[0])}%`,`50%: ${L(cutPointsPercent[1])}%`,`75%: ${L(cutPointsPercent[2])}%`,`100%: ${L(cutPointsPercent[3])}%`];
+  const parts=[`+0.25с: ${L(cutPointsPercent[0])}%`,`+0.50с: ${L(cutPointsPercent[1])}%`,`+0.75с: ${L(cutPointsPercent[2])}%`,`+1.00с: ${L(cutPointsPercent[3])}%`];
   line += `, ${cutLbl}: ` + parts.join(', ');
 }
     } catch(e) {}
@@ -428,7 +428,7 @@ function composeSignalInfoText(){
       const mode = getMode();
       if (mode==='main' && !getNormalizationReference() && Array.isArray(cutPointsPercent) && cutPointsPercent.length) {
   const L=val=> (val!=null?Number(val).toFixed(1):'—');
-  const parts=[`25%: ${L(cutPointsPercent[0])}%`,`50%: ${L(cutPointsPercent[1])}%`,`75%: ${L(cutPointsPercent[2])}%`,`100%: ${L(cutPointsPercent[3])}%`];
+  const parts=[`+0.25с: ${L(cutPointsPercent[0])}%`,`+0.50с: ${L(cutPointsPercent[1])}%`,`+0.75с: ${L(cutPointsPercent[2])}%`,`+1.00с: ${L(cutPointsPercent[3])}%`];
   line += `, ${cutLbl}: ` + parts.join(', ');
 }
     } catch(e) {}
