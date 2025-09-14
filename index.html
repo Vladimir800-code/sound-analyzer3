@@ -136,7 +136,16 @@
           <input id="stabSlider" type="range" min="0" max="5" step="0.25" value="1" style="flex:1;">
           <span id="stabValue" style="min-width:56px; text-align:right;">1.00%</span>
         </div>
-        <div style="font-size:12px; color:#666; margin-top:6px;">Lower = более чувствительно к завершению, Higher = более строгое завершение.</div>
+        <div style="font-size:12px; color:#666; margin-top:6px;">Lower = более чувствительно к завершению, Higher = более строгое завершение.
+      <div style="margin-top:14px; font-size:14px;">
+        <label for="gainSlider" style="display:block; margin-bottom:6px; font-weight:600;">Signal gain (×)</label>
+        <div style="display:flex; align-items:center; gap:10px;">
+          <input id="gainSlider" type="range" min="0.1" max="2.0" step="0.1" value="1.0" style="flex:1;">
+          <span id="gainValue" style="min-width:56px; text-align:right;">×1.0</span>
+        </div>
+        <div style="font-size:12px; color:#666; margin-top:6px;">Applies instantly and is saved locally. Default is ×1.0 (no change).</div>
+      </div>
+</div>
       </div>
       <div style="font-size:12px;color:#666;margin-top:8px;">
         * Threshold is computed as the maximum of the chosen percent of the current max intensity and an absolute floor.
@@ -254,6 +263,19 @@ function getStabilityCriterion(){
   return getStabilityPct() / 100;
 }
 
+
+/* Signal gain persistence */
+const SIGNAL_GAIN_KEY = 'signal_gain_v1';
+function getSignalGain(){
+  let v = parseFloat(localStorage.getItem(SIGNAL_GAIN_KEY));
+  if (!(v>=0.1 && v<=2.0)) v = 1.0;
+  return v;
+}
+function setSignalGain(v){
+  v = Math.max(0.1, Math.min(2.0, Number(v)||1.0));
+  localStorage.setItem(SIGNAL_GAIN_KEY, String(v));
+  return v;
+}
 const ABSOLUTE_FLOOR = 0.001;
 // const INTEGRAL_STABILITY_THRESHOLD = 0.01; // replaced by getStabilityCriterion()
 const STABLE_SAMPLES_REQUIRED = 10;
@@ -653,7 +675,7 @@ function rms(b){let a=0;for(let v of b)a+=v*v;return Math.sqrt(a/(b.length||1));
 function tick(){
   if(!recording) return;
   const buffer=new Float32Array(analyser.fftSize); analyser.getFloatTimeDomainData(buffer);
-  const r=rms(buffer), intensity=r*r;
+  const r=rms(buffer), intensity=(r*r) * (getSignalGain()**2);
   const t=audioCtx.currentTime, dt=Math.max(0,t-lastT); lastT=t;
   const relTime = t - t0; sampleTimes.push(relTime);
   const last=(integralValues.length?integralValues[integralValues.length-1]:0);
@@ -804,7 +826,22 @@ function init(){
       });
     }
   }catch(e){} 
-  drawEnergyHistory();
+  
+  // Initialize signal gain slider (technical modal)
+  try{
+    const gSlider = document.getElementById('gainSlider');
+    const gOut = document.getElementById('gainValue');
+    if (gSlider && gOut){
+      const gs = getSignalGain();
+      gSlider.value = String(gs.toFixed(1));
+      gOut.textContent = '×'+gs.toFixed(1);
+      gSlider.addEventListener('input', (e)=>{
+        const v = setSignalGain(parseFloat(e.target.value));
+        gOut.textContent = '×'+v.toFixed(1);
+      });
+    }
+  }catch(e){} 
+drawEnergyHistory();
   // Ensure modal is English at startup:
   try{
     const tt=document.getElementById('techTitle'); if(tt) tt.textContent='Technical settings';
