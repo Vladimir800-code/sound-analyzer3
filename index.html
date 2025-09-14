@@ -939,12 +939,12 @@ if(isMain){
 function fillTableNorm(tid, rows){
   const tb=document.getElementById(tid); tb.innerHTML='';
   if(!rows.length){ document.getElementById('noteNorm').textContent='Нет данных нормирования.'; return; }
-  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const ts = new Date(r.ts).toLocaleString(); const en = (r.energy!=null)?((Number(r.energy)===0)?'0':Number(r.energy).toExponential(3).replace('e','×10^')):''; [i+1, ts, en].forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
+  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const ts = new Date(r.ts).toLocaleString(); const en = (r.energy!=null)?((Number(r.energy)===0)?'0':Number(r.energy).toExponential(3).replace('e','×10^')):''; [i, ts, en].forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
 }
 function fillTableMain(tid, rows){
   const tb=document.getElementById(tid); tb.innerHTML='';
   if(!rows.length){ document.getElementById('noteMain').textContent='Нет данных основного режима.'; return; }
-  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const cells=[i+1, new Date(r.ts).toLocaleString(), (r.norm!=null)?Number(r.norm).toFixed(3):'', (r.cuts && r.cuts.length? Number(r.cuts[0]??'').toFixed(1):'') ,
+  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const cells=[i, new Date(r.ts).toLocaleString(), (r.norm!=null)?Number(r.norm).toFixed(3):'', (r.cuts && r.cuts.length? Number(r.cuts[0]??'').toFixed(1):'') ,
  (r.cuts && r.cuts.length? Number(r.cuts[1]??'').toFixed(1):'') ,
  (r.cuts && r.cuts.length? Number(r.cuts[2]??'').toFixed(1):'') ,
  (r.cuts && r.cuts.length? Number(r.cuts[3]??'').toFixed(1):'') ]; cells.forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
