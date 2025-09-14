@@ -483,20 +483,21 @@ function drawEnergyHistory(){
   hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
   if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?tr('statusHistEmptyMain'):tr('statusHistEmptyNorm'),20,30);return;}
   const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
-  const leftPad=50,bottomPad=28,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
+  const leftPad=50,bottomPad=72,rightPad=20,topPad=12; const W=historyCanvas.width-leftPad-rightPad,H=historyCanvas.height-topPad-bottomPad;
   try {
-    if (isMain && !getNormalizationReference()) {
-      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-      const yFromVal = (val) => { const y = topPad + H - (H * (val / (maxV || 1))); return clamp(y, topPad, topPad + H); };
-      const y0   = yFromVal(0);
-      const y05  = yFromVal(0.5);
-      const y08  = yFromVal(0.8);
-      const y10  = yFromVal(1.0);
-      hctx.fillStyle = 'rgba(255, 0, 0, 0.08)'; hctx.fillRect(leftPad, Math.min(y0, y05), W, Math.abs(y05 - y0));
-      hctx.fillStyle = 'rgba(255, 215, 0, 0.10)'; hctx.fillRect(leftPad, Math.min(y05, y08), W, Math.abs(y08 - y05));
-      hctx.fillStyle = 'rgba(0, 128, 0, 0.10)'; hctx.fillRect(leftPad, Math.min(y08, y10), W, Math.abs(y10 - y08));
-    }
-  } catch(e) { }
+  if (isMain) {
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    const yFromVal = (val) => { const y = topPad + H - (H * (val / (maxV || 1))); return clamp(y, topPad, topPad + H); };
+    const y0   = yFromVal(0);
+    const y05  = yFromVal(0.5);
+    const y08  = yFromVal(0.8);
+    const yMax = yFromVal(maxV || 1);
+    hctx.fillStyle = 'rgba(255, 0, 0, 0.08)';   hctx.fillRect(leftPad, Math.min(y0, y05),  W, Math.abs(y05 - y0));
+    hctx.fillStyle = 'rgba(255, 215, 0, 0.10)'; hctx.fillRect(leftPad, Math.min(y05, y08), W, Math.abs(y08 - y05));
+    hctx.fillStyle = 'rgba(0, 128, 0, 0.10)';   hctx.fillRect(leftPad, Math.min(y08, yMax),W, Math.abs(yMax - y08));
+  }
+} catch(e) { }
+
   hctx.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue('--grid'); hctx.lineWidth=1;
   for(let i=0;i<=4;i++){const y=topPad+H-(H*i/4);hctx.beginPath();hctx.moveTo(leftPad,y);hctx.lineTo(leftPad+W,y);hctx.stroke();hctx.fillStyle='#555';hctx.font='11px Arial';const v=maxV*i/4;const lab=isMain?v.toFixed(2):v.toExponential(2);hctx.fillText(lab,6,y-2);}
   hctx.strokeStyle='#000';hctx.beginPath();hctx.moveTo(leftPad,topPad);hctx.lineTo(leftPad,topPad+H);hctx.lineTo(leftPad+W,topPad+H);hctx.stroke();
@@ -508,8 +509,8 @@ function drawEnergyHistory(){
     hctx.strokeStyle = '#ff0066'; hctx.lineWidth = 1.5; hctx.stroke();
     for (let i=0;i<N;i++){ const rec = data[i]||{}; if (typeof rec.cut==='number'){ const x = leftPad + (W*(i/Math.max(1,N-1))); const y = topPad + H - (H*((rec.cut/100)/maxV)); hctx.beginPath(); hctx.arc(x, y, 4, 0, Math.PI*2); hctx.fillStyle = '#ff0066'; hctx.fill(); } }
   }
-  hctx.fillStyle='#111';hctx.font='10px Arial';const step=1;
-  for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.fillText(lab,x-32,topPad+H+14);}}
+  hctx.fillStyle='#111';hctx.font='9px Arial';const step=1;
+  for(let i=0;i<N;i++){const x=leftPad+(W*(i/Math.max(1,N-1))); const y=topPad+H-(H*(vals[i]/maxV)); hctx.beginPath();hctx.arc(x,y,2.5,0,Math.PI*2);hctx.fill(); if(i%step===0||i===N-1){const d=new Date(data[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});hctx.save(); hctx.translate(x, topPad+H+36); hctx.rotate(-35*Math.PI/180); hctx.textAlign='right'; hctx.textBaseline='top'; hctx.fillText(lab,0,0); hctx.restore();}}
 }
 
 /* Remove last + auto-repeat */
@@ -857,7 +858,7 @@ function niceNum(r,round){const e=Math.floor(Math.log10(r||1)),f=(r/Math.pow(10,
 function niceAxis(a,b,n){if(a===b){b=a+1;}const rg=niceNum(b-a,false),st=niceNum(rg/(n-1),true),g0=Math.floor(a/st)*st,g1=Math.ceil(b/st)*st;const t=[];for(let v=g0;v<=g1+0.5*st;v+=st)t.push(v);return{min:g0,max:g1,step:st,ticks:t};}
 function drawHistory(canvasId, rows, isMain){
   const c = document.getElementById(canvasId), x = c.getContext('2d');
-  const left=50, right=20, top=12, bottom=28, W=c.width-left-right, H=c.height-top-bottom;
+  const left=50, right=20, top=12, bottom=72, W=c.width-left-right, H=c.height-top-bottom;
   x.clearRect(0,0,c.width,c.height);
   if(!rows || !rows.length){ x.fillStyle='#555'; x.font='14px Arial'; x.fillText('Нет данных',20,30); return; }
   const vals = rows.map(r=> isMain ? (+r.norm||0) : (+r.energy||0) );
@@ -870,13 +871,13 @@ function drawHistory(canvasId, rows, isMain){
   ax.ticks.forEach(v=>{ const y=top+H-(H*((v-ax.min)/(ax.max-ax.min||1))); const lab=isMain?v.toFixed(2):(v===0?'0':Number(v).toExponential(2)); x.fillText(lab,6,y-2); });
   if (isMain){
     const yFromVal=(val)=> top+H-(H*((val-ax.min)/(ax.max-ax.min||1)));
-    const y0=yFromVal(0), y05=yFromVal(0.5), y08=yFromVal(0.8), y10=yFromVal(1.0);
+    const y0=yFromVal(0), y05=yFromVal(0.5), y08=yFromVal(0.8), yTop=yFromVal(ax.max);
     x.fillStyle='rgba(255,0,0,0.08)';   x.fillRect(left, Math.min(y0,y05), W, Math.abs(y05-y0));
     x.fillStyle='rgba(255,215,0,0.10)'; x.fillRect(left, Math.min(y05,y08), W, Math.abs(y08-y05));
-    x.fillStyle='rgba(0,128,0,0.10)';   x.fillRect(left, Math.min(y08,y10), W, Math.abs(y10-y08));
+    x.fillStyle='rgba(0,128,0,0.10)';   x.fillRect(left, Math.min(y08,yTop), W, Math.abs(yTop-y08));
   }
-  x.fillStyle='#111'; x.font='10px Arial'; const N=rows.length, step=Math.ceil(N/8);
-  for(let i=0;i<N;i++){ const xv=left+(W*(i/Math.max(1,N-1))); if(i%step===0||i===N-1){ const d=new Date(rows[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); x.fillText(lab, xv-32, top+H+14); } }
+  x.fillStyle='#111'; x.font='9px Arial'; const N=rows.length, step=1;
+  for(let i=0;i<N;i++){ const xv=left+(W*(i/Math.max(1,N-1))); if(i%step===0||i===N-1){ const d=new Date(rows[i].ts); const lab=d.toLocaleString(undefined,{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); x.save(); x.translate(xv, top+H+36); x.rotate(-35*Math.PI/180); x.textAlign='right'; x.textBaseline='top'; x.fillText(lab,0,0); x.restore(); } }
   x.beginPath();
   for(let i=0;i<N;i++){ const xv=left+(W*(i/Math.max(1,N-1))); const yv=top+H-(H*((vals[i]-ax.min)/(ax.max-ax.min||1))); if(i===0) x.moveTo(xv,yv); else x.lineTo(xv,yv); }
   x.strokeStyle=isMain?'#1aab55':'#2f6fed'; x.lineWidth=2; x.stroke();
@@ -890,12 +891,12 @@ function drawHistory(canvasId, rows, isMain){
 function fillTableNorm(tid, rows){
   const tb=document.getElementById(tid); tb.innerHTML='';
   if(!rows.length){ document.getElementById('noteNorm').textContent='Нет данных нормирования.'; return; }
-  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const ts = new Date(r.ts).toLocaleString(); const en = (r.energy!=null)?((Number(r.energy)===0)?'0':Number(r.energy).toExponential(3).replace('e','×10^')):''; [i+1, ts, en].forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
+  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const ts = new Date(r.ts).toLocaleString(); const en = (r.energy!=null)?((Number(r.energy)===0)?'0':Number(r.energy).toExponential(3).replace('e','×10^')):''; [i,  ts, en].forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
 }
 function fillTableMain(tid, rows){
   const tb=document.getElementById(tid); tb.innerHTML='';
   if(!rows.length){ document.getElementById('noteMain').textContent='Нет данных основного режима.'; return; }
-  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const cells=[i+1, new Date(r.ts).toLocaleString(), (r.norm!=null)?Number(r.norm).toFixed(3):'', (r.cut!=null)?(Number(r.cut).toFixed(1)):'']; cells.forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
+  rows.forEach((r,i)=>{ const tr=document.createElement('tr'); const cells=[i,  new Date(r.ts).toLocaleString(), (r.norm!=null)?Number(r.norm).toFixed(3):'', (r.cut!=null)?(Number(r.cut).toFixed(1)):'']; cells.forEach(val=>{ const td=document.createElement('td'); td.textContent=String(val); tr.appendChild(td); }); tb.appendChild(tr); });
 }
 (function(){
   const normRows = Array.isArray(dataNorm)?dataNorm:[];
