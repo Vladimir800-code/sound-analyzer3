@@ -119,6 +119,7 @@
   <div class="modal-card" onclick="event.stopPropagation();">
     <div class="modal-header">
       <span id="techTitle" class="modal-title">Technical settings</span>
+      <button id="btnCloseTechTop" class="button" style="margin-left:auto">Close</button>
     </div>
     <div class="modal-body">
       <div class="threshold-info" id="thresholdInfo">Current threshold: —</div>
@@ -136,7 +137,7 @@
           <input id="stabSlider" type="range" min="0" max="5" step="0.25" value="1" style="flex:1;">
           <span id="stabValue" style="min-width:56px; text-align:right;">1.00%</span>
         </div>
-        <div style="font-size:12px; color:#666; margin-top:6px;">Lower = более чувствительно к завершению, Higher = более строгое завершение.
+        <div style="font-size:12px; color:#666; margin-top:6px;">Lower = более чувствительно к завершению, Higher = более строгое завершение.</div>
       <div style="margin-top:14px; font-size:14px;">
         <label for="gainSlider" style="display:block; margin-bottom:6px; font-weight:600;">Signal gain (×)</label>
         <div style="display:flex; align-items:center; gap:10px;">
@@ -159,8 +160,8 @@
 
 <div id="lowIntensityWarning" class="low-intensity-warning" style="display: none;">
   <span class="warning-icon">⚠️</span>
-  НИЗКАЯ ИНТЕНСИВНОСТЬ СИГНАЛА!<br>
-  Увеличьте громкость!
+  <span id="overTitle"></span><br>
+  <span id="overHint"></span>
 </div>
 
 <script>
@@ -168,16 +169,35 @@
 const LANG_KEY='ui_lang_v1';
 function currLang(){ return localStorage.getItem(LANG_KEY)||'ru'; }
 const translations={
-  ru:{title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",startLabel:"Начало",endLabel:"Конец",durationLabel:"Длительность",cutLabel:"Точка отсечения",secUnit:"с"},
-  en:{title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s",startLabel:"Start",endLabel:"End",durationLabel:"Duration",cutLabel:"Cutoff point",secUnit:"s"},
-  he:{title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופפון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",startLabel:"התחלה",endLabel:"סוף",durationLabel:"משך",cutLabel:"נקודת חיתוך",secUnit:"ש"}
+  ru:{overlayHint:"Увеличьте громкость!",overlayTitle:"СИГНАЛ НИЗКОЙ ИНТЕНСИВНОСТИ!",title:"Акустический анализ — Этап 1: «Нормирование» → Этап 2: «Основной анализ»",startNorm:"Начать нормирование",finishNorm:"Закончить нормирование",requestMic:"Разрешить доступ к микрофону",startRec:"Начать запись",stopRec:"Остановить",reset:"Сброс",resetLast:"Сбросить последнее",historyTitle:"История результатов текущего режима",historyHint:"В режиме нормирования — абсолютные асимптоты энергии (Вт·с/м²). В основном режиме — нормированные асимптоты (безразмерные, могут быть >1 или <1).",ready:"Готов.",modeBadgeNorm:"Режим: Нормирование",modeBadgeMain:"Режим: Основной анализ",yLeft:"Интенсивность (усл. ед.)",yRightNorm:"Нормированная энергия (отн.)",yRightRaw:"Энергия (Вт·с/м² — усл.)",histYNorm:"Нормированная асимптота (отн.)",histYAbs:"Интегральная энергия (Вт·с/м²)",histX:"№ сеанса / время",statusReady:"Готов.",statusMicOk:"✅ Доступ к микрофону получен.",statusMicErr:"❌ Нет доступа к микрофону: ",statusRec:"🟢 Запись запущена.",statusReset:"Сброс данных.",statusNormOn:"🟡 Режим нормирования.",statusMainOnNoRef:"⚠️ Нет эталона нормирования — самонормирование по 1.",statusMainOn:"🟢 Нормирование завершено. Эталон установлен.",statusMainDone:"✅ Анализ завершён.",statusHistEmptyNorm:"История нормирования пуста.",statusHistEmptyMain:"История основного режима пуста.",statusHistDelNorm:"Удалена последняя запись нормирования.",statusHistDelMain:"Удалена последняя запись основного режима.",signalInfo:"Начало: — с, Конец: — с, Длительность: — с",startLabel:"Начало",endLabel:"Конец",durationLabel:"Длительность",cutLabel:"Точка отсечения",secUnit:"с"},
+  en:{overlayHint:"Increase the volume!",overlayTitle:"LOW SIGNAL INTENSITY!",title:"Acoustic Analysis — Stage 1: Normalization → Stage 2: Main Analysis",startNorm:"Start normalization",finishNorm:"Finish normalization",requestMic:"Allow microphone access",startRec:"Start recording",stopRec:"Stop",reset:"Reset",resetLast:"Reset last",historyTitle:"History of current mode results",historyHint:"In normalization mode — absolute energy asymptotes (W·s/m²). In main mode — normalized asymptotes (dimensionless, can be >1 or <1).",ready:"Ready.",modeBadgeNorm:"Mode: Normalization",modeBadgeMain:"Mode: Main analysis",yLeft:"Intensity (arb.)",yRightNorm:"Normalized energy (rel.)",yRightRaw:"Energy (W·s/m² — arb.)",histYNorm:"Normalized asymptote (rel.)",histYAbs:"Integral energy (W·s/m²)",histX:"Session # / time",statusReady:"Ready.",statusMicOk:"✅ Microphone access granted.",statusMicErr:"❌ Microphone access denied: ",statusRec:"🟢 Recording…",statusReset:"Data reset.",statusNormOn:"🟡 Normalization mode.",statusMainOnNoRef:"⚠️ No normalization baseline — self-normalization to 1.",statusMainOn:"🟢 Normalization complete. Baseline set.",statusMainDone:"✅ Analysis finished.",statusHistEmptyNorm:"Normalization history is empty.",statusHistEmptyMain:"Main-mode history is empty.",statusHistDelNorm:"Last normalization entry deleted.",statusHistDelMain:"Last main-mode entry deleted.",signalInfo:"Start: — s, End: — s, Duration: — s",startLabel:"Start",endLabel:"End",durationLabel:"Duration",cutLabel:"Cutoff point",secUnit:"s"},
+  he:{overlayHint:"הגבירו את הווליום!",overlayTitle:"עצמת אות נמוכה!",title:"‏ניתוח אקוסטי — שלב 1: נרמול → שלב 2: ניתוח עיקרי",startNorm:"התחל נרמול",finishNorm:"סיים נרמול",requestMic:"אפשר גישה למיקרופון",startRec:"התחל הקלטה",stopRec:"עצור",reset:"איפוס",resetLast:"איפוס אחרון",historyTitle:"היסטוריית תוצאות המצב הנוכחי",historyHint:"במצב נרמול — אסימפטוטות אנרגיה מוחלטות (W·s/m²). במצב עיקרי — אסימפטוטות מנורמלות (ללא ממדים, עשויות להיות >1 או <1).",ready:"מוכן.",modeBadgeNorm:"מצב: נרמול",modeBadgeMain:"מצב: ניתוח עיקרי",yLeft:"עוצמה (יח' יחסיות)",yRightNorm:"אנרגיה מנורמלת (יחסי)",yRightRaw:"אנרגיה (W·s/m² — חישוב יחסי)",histYNorm:"אסימפטוטה מנורמלת (יחסי)",histYAbs:"אנרגיה אינטגרלית (W·s/m²)",histX:"מס' מושב / זמן",statusReady:"מוכן.",statusMicOk:"✅ הוענקה גישה למיקרופון.",statusMicErr:"❌ אין גישה למיקרופפון: ",statusRec:"🟢 הקלטה…",statusReset:"איפוס נתונים.",statusMainOnNoRef:"⚠️ אין בסיס נרמול — נרמול ל-1.",statusMainOn:"🟢 הנרמול הושלם. נקבע בסיס.",statusMainDone:"✅ הניתוח הושלם.",statusHistEmptyNorm:"היסטוריית הנרמול ריקה.",statusHistEmptyMain:"היסטוריית המצב העיקרי ריקה.",statusHistDelNorm:"נמחקה הרשומה האחרונה של הנרמול.",statusHistDelMain:"נמחקה הרשומה האחרונה של המצב העיקרי.",signalInfo:"התחלה: — ש, סוף: — ש, משך: — ש",startLabel:"התחלה",endLabel:"סוף",durationLabel:"משך",cutLabel:"נקודת חיתוך",secUnit:"ש"}
 };
+/* report i18n defaults */
+(function(){
+  const ensure=(obj,k,v)=>{ if(typeof obj[k]!=='string') obj[k]=v; };
+  const defs={
+    ru:{reportWindowTitle:"Acoustic Share Report",reportTitle:"Акустический спироанализатор — отчёт",reportDate:"Дата формирования:",sectionNorm:"История нормирования",sectionMain:"История основного режима",legendEnergy:"Интегральная энергия",legendNorm:"Нормированная асимптота",legendAsym:"Горизонтальная асимптота",legendCut:"Точка отсечения",timeLabel:"Время",energySciLabel:"Energy (sci)",normLabel:"Norm",noData:"Нет данных",secUnit:"с"},
+    en:{reportWindowTitle:"Acoustic Share Report",reportTitle:"Acoustic Spiro-Analyzer — Report",reportDate:"Generated:",sectionNorm:"Normalization history",sectionMain:"History of current mode results",legendEnergy:"Integral energy",legendNorm:"Normalized asymptote",legendAsym:"Horizontal asymptote",legendCut:"Cut point",timeLabel:"Time",energySciLabel:"Energy (sci)",normLabel:"Norm",noData:"No data",secUnit:"s"},
+    he:{reportWindowTitle:"דו״ח שיתוף אקוסטי",reportTitle:"אנליזת ספירו אקוסטית — דו״ח",reportDate:"נוצר בתאריך:",sectionNorm:"היסטוריית נורמליזציה",sectionMain:"היסטוריית תוצאות המצב הנוכחי",legendEnergy:"אנרגיה אינטגרלית",legendNorm:"אסימפטוטה מנורמלת",legendAsym:"אסימפטוטה אופקית",legendCut:"נקודת חיתוך",timeLabel:"זמן",energySciLabel:"Energy (sci)",normLabel:"Norm",noData:"אין נתונים",secUnit:"ש"}
+  };
+  ["ru","en","he"].forEach(L=>{ const d=translations[L]=translations[L]||{}; const s=defs[L]; Object.keys(s).forEach(k=>ensure(d,k,s[k])); });
+})();
 function tr(key){ try{ return (translations[currLang()]||translations.ru)[key] || key; }catch(e){ return key; } }
+function trSafe(key, fallback){ try{ const t=(translations[currLang()]||translations.ru)[key]; return (typeof t==='string' && t.trim())?t:fallback; }catch(_){ return fallback; } }
 function setStatus(msg, level='ok'){ const el=document.getElementById('status'); el.className='status '+(level||'ok'); el.textContent=msg; }
 function setThresholdInfo(msg){ const el=document.getElementById('thresholdInfo'); if(el) el.textContent=msg; }
 function textMatches(el,vars){const t=(el.textContent||'').trim();return vars.some(v=>v===t);}
 function findOrBindButton(id,keys){let el=document.getElementById(id);if(el)return el;const btns=Array.from(document.querySelectorAll('button'));for(const b of btns){if(textMatches(b,keys)){b.id=id;return b;}}return null;}
 function applyTranslations(lang){
+  try{
+    const t = translations[lang] || translations.ru;
+    const ot = document.getElementById('overTitle');
+    const oh = document.getElementById('overHint');
+    if (ot) ot.textContent = t.overlayTitle || 'LOW SIGNAL INTENSITY!';
+    if (oh) oh.textContent = t.overlayHint || 'Increase the volume!';
+  }catch(_){}
+
   const t=translations[lang]||translations.ru;
   const title=document.getElementById('titleText'); if(title) title.textContent=t.title;
   const b1=findOrBindButton('btnStartNorm',[translations.ru.startNorm,translations.en.startNorm,translations.he.startNorm]); if(b1) b1.textContent=t.startNorm;
@@ -441,10 +461,7 @@ function updateSignalInfo() {
   const si = document.getElementById('signalInfo');
   if (!si) return;
   si.textContent = composeSignalInfoText();
-  if (maxIntensity > 0 && maxIntensity < ABSOLUTE_FLOOR * 2) {
-    si.textContent += " ⚠️ НИЗКАЯ ИНТЕНСИВНОСТЬ!";
   }
-}
 
 /* History */
 function loadEnergyHistory(){ 
@@ -623,7 +640,7 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
       const xStart = (signalStartTime / totalTime) * canvas.width;
       ctx.beginPath(); ctx.setLineDash([5, 3]); ctx.moveTo(xStart, 0); ctx.lineTo(xStart, canvas.height);
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00'; ctx.lineWidth = 3; ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(255,107,0,0.7)'; ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00'; ctx.font = 'bold 12px Arial'; ctx.fillText('Начало', xStart + 5, 15);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-start') || '#ff6b00'; ctx.font = 'bold 12px Arial'; ctx.fillText(tr('startLabel'), xStart + 5, 15);
     }
   }
   try {
@@ -648,7 +665,7 @@ function drawGraph(intensityValues,secondSeries,isNorm=false){
       const xEnd = (signalEndTime / totalTime) * canvas.width;
       ctx.beginPath(); ctx.setLineDash([5, 3]); ctx.moveTo(xEnd, 0); ctx.lineTo(xEnd, canvas.height);
       ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066'; ctx.lineWidth = 3; ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(255,0,102,0.7)'; ctx.stroke(); ctx.setLineDash([]); ctx.shadowBlur = 0;
-      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066'; ctx.font = 'bold 12px Arial'; ctx.fillText('Конец', xEnd + 5, 30);
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--signal-end') || '#ff0066'; ctx.font = 'bold 12px Arial'; ctx.fillText(tr('endLabel'), xEnd + 5, 30);
     }
   }
   if (currentThreshold > 0) {
@@ -794,6 +811,8 @@ function init(){
   if(btnFinishNorm) btnFinishNorm.addEventListener('click',()=>setMode('main'));
   if(btnTech) btnTech.addEventListener('click', openTech);
   if(btnCloseTech) btnCloseTech.addEventListener('click', ()=>{ closeTech(); });
+  const btnCloseTechTop=document.getElementById('btnCloseTechTop');
+  if(btnCloseTechTop) btnCloseTechTop.addEventListener('click', ()=>{ closeTech(); });
   if(techModal){
     techModal.addEventListener('click', closeTech);
     window.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeTech(); });
@@ -846,6 +865,7 @@ drawEnergyHistory();
   try{
     const tt=document.getElementById('techTitle'); if(tt) tt.textContent='Technical settings';
     const bc=document.getElementById('btnCloseTech'); if(bc) bc.textContent='Close';
+    const bcTop=document.getElementById('btnCloseTechTop'); if(bcTop) bcTop.textContent='Close';
     const ti=document.getElementById('thresholdInfo'); if(ti && (ti.textContent.trim()===''||ti.textContent.includes('—'))) ti.textContent='Current threshold: —';
   }catch(e){}
 }
@@ -896,28 +916,27 @@ window.addEventListener('load',init);
     const {normHist, mainHist} = collectHistories();
     const norm = JSON.stringify(normHist).replace(/</g,'\\u003C');
     const main = JSON.stringify(mainHist).replace(/</g,'\\u003C');
+    const lang = (localStorage.getItem(LANG_KEY) || 'ru');
     const parts = [];
-    parts.push('<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Acoustic Share Report</title>');
+    parts.push('<!DOCTYPE html><html lang="'+lang+'"><head><meta charset="UTF-8"><title>'+trSafe('reportWindowTitle','Acoustic Share Report')+'</title>');
     parts.push('<meta name="viewport" content="width=device-width, initial-scale=1">');
     parts.push('<style>body{font-family:Arial,sans-serif;margin:20px;}h1{font-size:20px;margin:0 0 6px 0;}h2{font-size:16px;margin:14px 0 6px 0;}canvas{border:1px solid #ddd;border-radius:6px;width:100%;height:260px;}table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #ccc;padding:6px 8px;}th{background:#f5f5f5;}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}.legend{display:flex;gap:14px;align-items:center;margin:6px 0 2px 0;font-size:12px;color:#333}.chip{width:12px;height:12px;border-radius:2px;display:inline-block;border:1px solid #999}.c-energy{background:#cfe8ff;border-color:#6aa0ff}.c-norm{background:#d7f5e3;border-color:#42a362}.c-cut{background:#ffd7e8;border-color:#ff66a3}.bg-red{background:rgba(255,0,0,0.08)}.bg-yellow{background:rgba(255,215,0,0.10)}.bg-green{background:rgba(0,128,0,0.10)}.card{border:1px solid #ddd;border-radius:10px;padding:12px;margin:10px 0;}.note{margin:8px 0 0 2px;color:#666;font-size:12px;}</style>');
     parts.push('</head><body>');
-    parts.push('<h1>Акустический спироанализатор — отчёт</h1>');
-    parts.push('<div>Дата формирования: ' + new Date().toLocaleString() + '</div>');
+    parts.push('<h1>'+trSafe('reportTitle','Акустический спироанализатор — отчёт')+'</h1>');
+    parts.push('<div>'+trSafe('reportDate','Дата формирования:')+' '+ new Date().toLocaleString() + '</div>');
 
-    parts.push('<div class="card"><h2>История нормирования</h2>');
-    parts.push('<div class="legend"><span class="chip c-energy"></span> Интегральная энергия</div>');
-    if(!('+norm+').length){/*placeholder*/}
+    parts.push('<div class="card"><h2>'+trSafe('sectionNorm','История нормирования')+'</h2>');
+    parts.push('<div class="legend"><span class="chip c-energy"></span> '+trSafe('legendEnergy','Интегральная энергия')+'</div>');
     parts.push('<div class="grid"><canvas id="cnNorm" width="800" height="260"></canvas>');
-    parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Energy (sci)</th></tr></thead><tbody id="tbNorm"></tbody></table>');
+    parts.push('<div><table><thead><tr><th>#</th><th>'+trSafe('timeLabel','Время')+'</th><th>'+trSafe('energySciLabel','Energy (sci)')+'</th></tr></thead><tbody id="tbNorm"></tbody></table>');
     parts.push('<div class="note" id="noteNorm"></div></div></div></div>');
 
-    parts.push('<div class="card"><h2>История основного режима</h2>');
-    parts.push('<div class="legend"><span class="chip c-norm"></span> Нормированная асимптота <span class="chip c-cut"></span> Точка отсечения</div>');
+    parts.push('<div class="card"><h2>'+trSafe('sectionMain','История основного режима')+'</h2>');
+    parts.push('<div class="legend"><span class="chip c-norm"></span> '+trSafe('legendNorm','Нормированная асимптота')+' <span class="chip c-cut"></span> '+trSafe('legendCut','Точка отсечения')+'</div>');
     parts.push('<div class="grid"><canvas id="cnMain" width="800" height="260"></canvas>');
-    parts.push('<div><table><thead><tr><th>#</th><th>Время</th><th>Norm</th><th>+0.25 с</th><th>+0.50 с</th><th>+0.75 с</th><th>+1.00 с</th></tr></thead><tbody id="tbMain"></tbody></table>');
+    parts.push('<div><table><thead><tr><th>#</th><th>'+trSafe('timeLabel','Время')+'</th><th>'+trSafe('normLabel','Norm')+'</th><th>+0.25 '+trSafe('secUnit','с')+'</th><th>+0.50 '+trSafe('secUnit','с')+'</th><th>+0.75 '+trSafe('secUnit','с')+'</th><th>+1.00 '+trSafe('secUnit','с')+'</th></tr></thead><tbody id="tbMain"></tbody></table>');
     parts.push('<div class="note" id="noteMain"></div></div></div></div>');
-
-    parts.push('<script>');
+parts.push('<script>');
     parts.push('const dataNorm = ' + norm + '; const dataMain = ' + main + ';');
     parts.push(`
 function percentile(a,p){a=a.slice().filter(v=>isFinite(v)).sort((x,y)=>x-y);if(!a.length)return 0;const i=(p/100)*(a.length-1);const lo=Math.floor(i),hi=Math.ceil(i);if(lo===hi)return a[lo];const w=i-lo;return a[lo]*(1-w)+a[hi]*w;}
@@ -927,7 +946,7 @@ function drawHistory(canvasId, rows, isMain){
 const c = document.getElementById(canvasId), x = c.getContext('2d');
   const left=50, right=20, top=12, bottom=28, W=c.width-left-right, H=c.height-top-bottom;
   x.clearRect(0,0,c.width,c.height);
-  if(!rows || !rows.length){ x.fillStyle='#555'; x.font='14px Arial'; x.fillText('Нет данных',20,30); return; }
+  if(!rows || !rows.length){ x.fillStyle='#555'; x.font='14px Arial'; x.fillText(NO_DATA,20,30); return; }
   const vals = rows.map(r=> isMain ? (+r.norm||0) : (+r.energy||0) );
   const maxCandidate = isMain ? Math.max.apply(null, vals.concat([1])) : Math.max(percentile(vals,95), 1e-12);
   const ax = niceAxis(0, maxCandidate, 6);
