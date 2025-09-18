@@ -517,7 +517,9 @@ function getNormalizationReference(){
 
 function drawEnergyHistory(){
   const mode=getMode(), isMain=(mode==='main');
-  const data=isMain?loadEnergyHistoryMain():loadEnergyHistory();
+  const _all = isMain?loadEnergyHistoryMain():loadEnergyHistory();
+  // visual-only: keep arrays intact, hide leading zero marker
+  const data = (Array.isArray(_all) && _all.length && (function(r){ try{ const ts0=r&&r.ts&&new Date(r.ts).getTime()===0; const v0=isMain?Number(r.norm)===0:Number(r.energy)===0; return ts0&&v0; }catch(_){return false;} })(_all[0])) ? _all.slice(1) : _all;
   hctx.clearRect(0,0,historyCanvas.width,historyCanvas.height);
   if(!data.length){hctx.fillStyle='#555'; hctx.font='14px Arial'; hctx.fillText(isMain?tr('statusHistEmptyMain'):tr('statusHistEmptyNorm'),20,30);return;}
   const vals=data.map(d=>isMain?(+d.norm||0):(+d.energy||0)); const maxV=Math.max(...vals)||1;
@@ -912,8 +914,43 @@ window.addEventListener('load',init);
     return {normHist: Array.isArray(normHist)?normHist:[], mainHist: Array.isArray(mainHist)?mainHist:[]};
   }
 
-  function exportHTMLReport(){
+  
+  // --- Safe wrapper to avoid silent failures on Share click ---
+  function exportHTMLReportSafe(){
+    try { return exportHTMLReport(); }
+    catch(e){
+      console.error('exportHTMLReport failed:', e);
+      try{
+        // Minimal fallback: empty report with error note
+        const html='<!DOCTYPE html><html><head><meta charset="utf-8"><title>Acoustic Share Report (fallback)</title></head><body>' +
+                   '<h1>Acoustic Share Report</h1><p>Fallback used due to error.</p></body></html>';
+        const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a'); a.href=url;
+        const stamp=new Date().toISOString().replace(/[:.]/g,'-').slice(0,19);
+        a.download='acoustic_share_'+stamp+'.html'; document.body.appendChild(a); a.click();
+        setTimeout(()=>{URL.revokeObjectURL(url); a.remove();},0);
+      }catch(_){ /* swallow */ }
+    }
+  }
+function exportHTMLReport(){
     const {normHist, mainHist} = collectHistories();
+
+    // --- Export safety normalization (fields + drop leading zero) ---
+    const normHistN = (Array.isArray(normHist)?normHist:[]).map(r=>({ 
+      ts: r.ts||r.time||r.date||new Date(0).toISOString(), 
+      energy: (r.energy!=null)?Number(r.energy):(r.E!=null?Number(r.E):0)
+    }));
+    const mainHistN = (Array.isArray(mainHist)?mainHist:[]).map(r=>({ 
+      ts: r.ts||r.time||r.date||new Date(0).toISOString(), 
+      norm: (r.norm!=null)?Number(r.norm):((r.normalized!=null)?Number(r.normalized):(r.value!=null?Number(r.value):(r.val!=null?Number(r.val):0))),
+      cuts: Array.isArray(r.cuts)? r.cuts : (r.cut!=null? [r.cut]: [])
+    }));
+    const isZeroRow=(row,isMain)=>{ try{ const ts0=row&&row.ts&&new Date(row.ts).getTime()===0;
+      const v0=isMain? (Number(row.norm)===0) : (Number(row.energy)===0); return ts0&&v0; }catch(_){ return false; } };
+    const normHistClean = (normHistN.length && isZeroRow(normHistN[0],false)) ? normHistN.slice(1) : normHistN;
+    const mainHistClean = (mainHistN.length && isZeroRow(mainHistN[0],true)) ? mainHistN.slice(1) : mainHistN;
+
     const norm = JSON.stringify(normHist).replace(/</g,'\\u003C');
     const main = JSON.stringify(mainHist).replace(/</g,'\\u003C');
     const lang = (localStorage.getItem(LANG_KEY) || 'ru');
@@ -937,7 +974,14 @@ window.addEventListener('load',init);
     parts.push('<div><table><thead><tr><th>#</th><th>'+trSafe('timeLabel','Время')+'</th><th>'+trSafe('normLabel','Norm')+'</th><th>+0.25 '+trSafe('secUnit','с')+'</th><th>+0.50 '+trSafe('secUnit','с')+'</th><th>+0.75 '+trSafe('secUnit','с')+'</th><th>+1.00 '+trSafe('secUnit','с')+'</th></tr></thead><tbody id="tbMain"></tbody></table>');
     parts.push('<div class="note" id="noteMain"></div></div></div></div>');
 parts.push('<script>');
+    // Helper to renumber table rows starting from 1 (only inside the report)
+    parts.push('function renumber(tid){ try{ var tb=document.getElementById(tid); if(!tb) return; var rs=tb.rows; for(var i=0;i<rs.length;i++){ if(rs[i].cells && rs[i].cells.length){ rs[i].cells[0].textContent=String(i+1); } } }catch(_){}}');
+
     parts.push('const dataNorm = ' + norm + '; const dataMain = ' + main + ';');
+    // Localized "no data" string for report canvas
+    const __NO_DATA = trSafe('noData','Нет данных');
+    parts.push('const NO_DATA = ' + JSON.stringify(__NO_DATA) + ';');
+
     parts.push(`
 function percentile(a,p){a=a.slice().filter(v=>isFinite(v)).sort((x,y)=>x-y);if(!a.length)return 0;const i=(p/100)*(a.length-1);const lo=Math.floor(i),hi=Math.ceil(i);if(lo===hi)return a[lo];const w=i-lo;return a[lo]*(1-w)+a[hi]*w;}
 function niceNum(r,round){const e=Math.floor(Math.log10(r||1)),f=(r/Math.pow(10,e))||1;let nf;if(round){if(f<1.5)nf=1;else if(f<3)nf=2;else if(f<7)nf=5;else nf=10;}else{if(f<=1)nf=1;else if(f<=2)nf=2;else if(f<=5)nf=5;else nf=10;}return nf*Math.pow(10,e);}
@@ -1012,10 +1056,13 @@ function fillTableMain(tid, rows){
 (function(){
   const normRows = Array.isArray(dataNorm)?dataNorm:[];
   const mainRows = Array.isArray(dataMain)?dataMain:[];
-  drawHistory('cnNorm', normRows, false);
-  fillTableNorm('tbNorm', normRows);
-  drawHistory('cnMain', mainRows, true);
-  fillTableMain('tbMain', mainRows);
+  const isZero=(r,isMain)=>{ try{ const ts0=r&&r.ts&&new Date(r.ts).getTime()===0; const v0=isMain?Number(r.norm)===0:Number(r.energy)===0; return ts0&&v0; }catch(_){ return false; } };
+  const normVis = (normRows.length && isZero(normRows[0],false)) ? normRows.slice(1) : normRows;
+  const mainVis = (mainRows.length && isZero(mainRows[0],true))  ? mainRows.slice(1) : mainRows;
+  drawHistory('cnNorm', normVis, false);
+  fillTableNorm('tbNorm', normVis); renumber('tbNorm');
+  drawHistory('cnMain', mainVis, true);
+  fillTableMain('tbMain', mainVis); renumber('tbMain');
 })();`);
     parts.push('<\/script>');
     parts.push('</body></html>');
@@ -1035,7 +1082,7 @@ function fillTableMain(tid, rows){
     btn.id = 'btnShare';
     btn.className = 'button';
     btn.textContent = (currLang()==='en' ? 'Share' : (currLang()==='he' ? 'שתף' : 'Поделиться'));
-    btn.addEventListener('click', exportHTMLReport);
+    btn.addEventListener('click', exportHTMLReportSafe);
     target.appendChild(btn);
   }
   if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', ensureShareButton); }
