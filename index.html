@@ -396,7 +396,7 @@ function detectSignal(intensity, currentIntegral, currentTime) {
     }
     hideLowIntensityWarning();
   }
-  if (!isSignalActive && intensity > relativeThreshold) {
+  if (!isSignalActive && signalEndTime === null && intensity > relativeThreshold) {
     isSignalActive = true;
     signalStartTime = timeFromStart;
     lastIntegralValue = currentIntegral;
