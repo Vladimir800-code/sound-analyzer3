@@ -71,6 +71,8 @@
   .modal-title{ font-weight: 700; font-size:16px; }
   .modal-body{ padding: 14px 16px 18px; }
   .modal-actions{ padding: 10px 16px; border-top: 1px solid #eee; display:flex; justify-content:flex-end; gap:8px; }
+
+#btnRequestMic{display:none!important}
 </style>
 </head>
 <body>
@@ -794,19 +796,15 @@ function initI18n(){
   sel.addEventListener('change',e=>{ applyTranslations(e.target.value); try{ drawEnergyHistory(); }catch(_){}});
 }
 function init(){
+  try{ requestMicrophoneAccess(); }catch(_){}
+
   initI18n(); applyMode();
   const slider = document.getElementById('thrSlider');
   const out = document.getElementById('thrValue');
   const s2 = document.getElementById('stabSlider');
   const o2 = document.getElementById('stabValue');
   if(btnRequestMic) btnRequestMic.addEventListener('click',requestMicrophoneAccess);
-  if(btnStart) btnStart.addEventListener('click',()=>{
-    if(!analyser){ setStatus('Сначала разрешите микрофон.','error'); return; }
-    resetRecording();
-    recording=true; t0=audioCtx.currentTime; lastT=t0;
-    setStatus(tr('statusRec'),'ok');
-    tick();
-  });
+  if(btnStart) btnStart.addEventListener('click', async ()=>{  try{ if(!analyser){ await requestMicrophoneAccess(); } }catch(_){ }  if(!analyser){ setStatus('Сначала разрешите микрофон.','error'); return; }  resetRecording(); recording=true; t0=audioCtx.currentTime; lastT=t0;  setStatus(tr('statusRec'),'ok'); tick();});
   if(btnStop) btnStop.addEventListener('click',stopRecordingAndFinalize);
   if(btnReset) btnReset.addEventListener('click',resetRecording);
   if(btnStartNorm) btnStartNorm.addEventListener('click',()=>setMode('normalization'));
